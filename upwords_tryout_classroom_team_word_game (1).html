@@ -1,0 +1,3116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>UpWords Tryout! — Smartboard Classroom Team Word Game</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Fredoka & Nunito for a cheerful, high-legibility Smartboard UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <style>
+    :root {
+      --font-display: 'Fredoka', sans-serif;
+      --font-body: 'Nunito', sans-serif;
+    }
+
+    /* LOCKED ZERO-SCROLL SMARTBOARD VIEWPORT */
+    html, body {
+      font-family: var(--font-body);
+      background: radial-gradient(circle at top left, #fef08a 0%, #bae6fd 45%, #e9d5ff 100%);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1, h2, h3, h4, .font-display {
+      font-family: var(--font-display);
+    }
+
+    /* Tactile 3D Game Show Buttons */
+    .btn-3d {
+      transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.12s ease, filter 0.15s ease;
+      position: relative;
+      top: 0;
+    }
+    .btn-3d:hover:not(:disabled) {
+      filter: brightness(1.06);
+      transform: translateY(-2px);
+    }
+    .btn-3d:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 0 rgba(0,0,0,0.25) !important;
+    }
+    .btn-3d:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Smartboard Responsive 8x8 Board Container (Never overflows screen height) */
+    .smartboard-grid-wrapper {
+      width: min(100%, calc(100vh - 255px));
+      aspect-ratio: 1 / 1;
+    }
+
+    .board-cell {
+      aspect-ratio: 1 / 1;
+      position: relative;
+      border-radius: 10px;
+      transition: all 0.16s ease;
+      cursor: pointer;
+    }
+    .board-cell:hover {
+      transform: scale(1.04);
+      z-index: 10;
+    }
+
+    /* 3D Tile Stack Elevation (Heights 1 to 5) */
+    .tile-stack-1 {
+      box-shadow: 0 3px 0 #b45309, 0 5px 8px rgba(0,0,0,0.18);
+      transform: translateY(-1px);
+    }
+    .tile-stack-2 {
+      box-shadow: 0 2px 0 #d97706, 0 5px 0 #92400e, 0 7px 10px rgba(0,0,0,0.24);
+      transform: translateY(-3px);
+    }
+    .tile-stack-3 {
+      box-shadow: 0 2px 0 #d97706, 0 4px 0 #b45309, 0 7px 0 #78350f, 0 9px 12px rgba(0,0,0,0.28);
+      transform: translateY(-5px);
+    }
+    .tile-stack-4 {
+      box-shadow: 0 2px 0 #f59e0b, 0 4px 0 #d97706, 0 6px 0 #92400e, 0 9px 0 #451a03, 0 11px 14px rgba(0,0,0,0.32);
+      transform: translateY(-7px);
+    }
+    .tile-stack-5 {
+      box-shadow: 0 2px 0 #fbbf24, 0 4px 0 #d97706, 0 6px 0 #b45309, 0 8px 0 #78350f, 0 10px 0 #290f02, 0 13px 16px rgba(0,0,0,0.38);
+      transform: translateY(-9px);
+    }
+
+    /* Newly placed tile in current turn */
+    .tile-pending {
+      background: linear-gradient(180deg, #67e8f9 0%, #06b6d4 100%) !important;
+      color: #083344 !important;
+      border: 2px solid #cffafe !important;
+    }
+    .tile-pending.tile-stack-1 {
+      box-shadow: 0 3px 0 #0e7490, 0 5px 10px rgba(6, 182, 212, 0.35) !important;
+    }
+    .tile-pending.tile-stack-2, .tile-pending.tile-stack-3, .tile-pending.tile-stack-4, .tile-pending.tile-stack-5 {
+      box-shadow: 0 2px 0 #0891b2, 0 5px 0 #155e75, 0 8px 12px rgba(6, 182, 212, 0.45) !important;
+    }
+
+    /* Locked Board Tile */
+    .tile-locked {
+      background: linear-gradient(180deg, #fffbeb 0%, #fde68a 100%);
+      color: #451a03;
+      border: 2px solid #fef3c7;
+    }
+
+    /* Rack Tile Styling */
+    .rack-tile {
+      background: linear-gradient(180deg, #ffffff 0%, #fef08a 100%);
+      border: 3px solid #f59e0b;
+      box-shadow: 0 5px 0 #b45309, 0 6px 12px rgba(0,0,0,0.16);
+      transition: all 0.14s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+    }
+    .rack-tile:hover {
+      transform: translateY(-4px) scale(1.04);
+    }
+    .rack-tile.selected {
+      background: linear-gradient(180deg, #a5f3fc 0%, #22d3ee 100%);
+      border-color: #0284c7;
+      box-shadow: 0 6px 0 #0369a1, 0 0 16px rgba(34, 211, 238, 0.75);
+      transform: translateY(-7px) scale(1.07);
+    }
+
+    /* Hint Highlight Pulse on Board */
+    @keyframes hintPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.85), inset 0 0 12px rgba(74, 222, 128, 0.9);
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(34, 197, 94, 0), inset 0 0 22px rgba(74, 222, 128, 1);
+        transform: scale(1.07);
+      }
+    }
+    .hint-target-cell {
+      animation: hintPulse 1.2s infinite;
+      border: 3px dashed #16a34a !important;
+      z-index: 20;
+    }
+
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px) rotate(-1deg); }
+      50% { transform: translateY(-6px) rotate(1deg); }
+    }
+    .animate-float {
+      animation: floatSlow 3s ease-in-out infinite;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.6); opacity: 0; }
+      80% { transform: scale(1.05); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-pop {
+      animation: popIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    @keyframes greenGlowPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+      50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+    }
+    .green-stack-banner {
+      animation: popIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, greenGlowPulse 1.8s infinite;
+    }
+  </style>
+</head>
+<body class="text-slate-800 flex flex-col h-screen w-screen overflow-hidden">
+
+  <!-- =====================================================================
+       ASTRO'S PLAYROOM BACKGROUND MUSIC AUDIO ELEMENT
+       ===================================================================== -->
+  <audio id="bgmAudio" loop preload="auto">
+    <source src="https://raw.githubusercontent.com/wnadm9/AstroBot/456a22b4767167240a017173d9a212114a44e64a/Astro's%20Playroom%20OST%20-%2005%20Follow%20Me%20(Into%20The%20Storm)%20%5BPlayroom%20Remix%5D%20-%20(192%20Kbps).mp3" type="audio/mpeg">
+    <source src="https://github.com/wnadm9/AstroBot/raw/456a22b4767167240a017173d9a212114a44e64a/Astro's%20Playroom%20OST%20-%2005%20Follow%20Me%20(Into%20The%20Storm)%20%5BPlayroom%20Remix%5D%20-%20(192%20Kbps).mp3" type="audio/mpeg">
+  </audio>
+
+  <!-- CONFETTI & FLOATING SCORE OVERLAY CANVAS -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+  <div id="floatingScoreContainer" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
+
+  <!-- =====================================================================
+       TOP PERSISTENT NAVIGATION BAR (COMPACT, ZERO-SCROLL)
+       ===================================================================== -->
+  <header class="bg-indigo-950 text-white px-3 sm:px-5 py-2 shadow-lg border-b-4 border-indigo-700 shrink-0 z-30">
+    <div class="max-w-[1800px] mx-auto flex items-center justify-between gap-2">
+      <!-- Brand / Logo -->
+      <div class="flex items-center gap-2.5 cursor-pointer shrink-0" onclick="confirmReturnHome()">
+        <div class="relative flex items-center">
+          <div class="w-9 h-9 rounded-xl bg-amber-400 text-indigo-950 font-display font-bold text-xl flex items-center justify-center shadow-[0_3px_0_#b45309] transform -rotate-6">
+            U
+          </div>
+          <div class="w-9 h-9 rounded-xl bg-cyan-400 text-indigo-950 font-display font-bold text-xl flex items-center justify-center shadow-[0_3px_0_#0e7490] -ml-1.5 transform rotate-6">
+            W
+          </div>
+        </div>
+        <div>
+          <span class="font-display font-bold text-lg sm:text-xl tracking-wide text-white">UpWords <span class="text-amber-300">Tryout!</span></span>
+          <span class="hidden xl:inline-block ml-1.5 text-[11px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-600">
+            <i class="fa-solid fa-wifi text-[9px] mr-1"></i>Online Dictionary Active
+          </span>
+        </div>
+      </div>
+
+      <!-- Center Active Turn & Timer Controls (Visible Only During Game) -->
+      <div id="headerGameControls" class="hidden items-center gap-2 sm:gap-4">
+        <!-- Current Team Turn Pill -->
+        <div id="headerTurnBanner" class="flex items-center gap-2 px-3.5 py-1 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 font-display font-bold shadow border-2 border-white/60">
+          <span id="headerTeamIcon" class="text-lg"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+          <div class="leading-none">
+            <div class="text-[9px] uppercase tracking-wider font-extrabold opacity-80">Current Turn</div>
+            <div id="headerTeamName" class="text-sm sm:text-base">Team 1</div>
+          </div>
+        </div>
+
+        <!-- Big Classroom Countdown Timer -->
+        <div class="flex items-center gap-1.5 bg-slate-900/90 border-2 border-indigo-500/60 px-3 py-1 rounded-2xl">
+          <i class="fa-solid fa-clock text-amber-400 text-base animate-pulse"></i>
+          <span id="timerDisplay" class="font-display font-bold text-xl sm:text-2xl tracking-wider text-white tabular-nums">10:00</span>
+          <button onclick="togglePauseTimer()" id="pauseTimerBtn" title="Pause / Resume Timer" class="ml-1 w-7 h-7 rounded-lg bg-indigo-700 hover:bg-indigo-600 text-white flex items-center justify-center transition">
+            <i class="fa-solid fa-pause text-xs"></i>
+          </button>
+          <button onclick="addExtraMinute()" title="Teacher: Add +1 Minute" class="px-2 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold flex items-center transition">
+            +1m
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Action Buttons (Help Here, BGM Music Mute, SFX Mute, Rules, End Game) -->
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <!-- Prominent "Help Here!" Button (Stack Checker + Hint + Prefix Dictionary) -->
+        <button onclick="openHelpModal('stack')" class="btn-3d bg-gradient-to-b from-amber-300 to-amber-500 text-slate-950 font-display font-bold px-3 sm:px-4 py-1.5 rounded-xl shadow-[0_4px_0_#b45309] border border-amber-200 flex items-center gap-1.5 text-xs sm:text-sm">
+          <i class="fa-solid fa-lightbulb text-amber-950 text-base animate-bounce"></i>
+          <span>Help Here!</span>
+          <span class="hidden md:inline text-[11px] bg-amber-950/15 px-1.5 py-0.5 rounded font-sans font-extrabold">Stack Hint &amp; A-Z Finder</span>
+        </button>
+
+        <!-- Astro's Playroom Background Music Toggle Button -->
+        <div class="flex items-center bg-indigo-900/90 border border-indigo-600 rounded-xl p-0.5 shadow-[0_3px_0_#1e1b4b]">
+          <button onclick="toggleBgm()" id="bgmToggleBtn" class="px-2.5 py-1 rounded-lg font-display font-bold text-xs flex items-center gap-1.5 transition bg-emerald-600 text-white" title="Toggle Astro's Playroom Background Music">
+            <i id="bgmIcon" class="fa-solid fa-music"></i>
+            <span id="bgmLabel" class="hidden sm:inline">Music: ON</span>
+          </button>
+          <input id="bgmVolumeSlider" type="range" min="0" max="100" value="35" oninput="changeBgmVolume(this.value)" title="Background Music Volume" class="hidden lg:block w-14 h-1.5 mx-1.5 accent-amber-400 cursor-pointer" />
+        </div>
+
+        <!-- Sound Effects (SFX) Toggle Button -->
+        <button onclick="toggleSfxMute()" id="soundToggleBtn" class="btn-3d bg-indigo-800 hover:bg-indigo-700 text-white w-9 h-9 rounded-xl shadow-[0_3px_0_#1e1b4b] border border-indigo-600 flex items-center justify-center text-sm" title="Mute / Unmute Sound Effects">
+          <i id="soundToggleIcon" class="fa-solid fa-volume-high text-cyan-300"></i>
+        </button>
+
+        <!-- Rules Quick Button -->
+        <button onclick="openRulesModal()" class="btn-3d bg-indigo-800 hover:bg-indigo-700 text-indigo-100 font-display font-semibold px-2.5 py-1.5 rounded-xl shadow-[0_3px_0_#1e1b4b] border border-indigo-600 text-xs sm:text-sm flex items-center gap-1" title="How to Play UpWords">
+          <i class="fa-solid fa-circle-question text-cyan-300"></i>
+          <span class="hidden xl:inline">Rules</span>
+        </button>
+
+        <!-- End Game Button (Visible Only in Game) -->
+        <button id="endGameHeaderBtn" onclick="finishGame()" class="hidden btn-3d bg-rose-600 hover:bg-rose-500 text-white font-display font-semibold px-2.5 py-1.5 rounded-xl shadow-[0_3px_0_#881337] border border-rose-400 text-xs sm:text-sm items-center gap-1">
+          <i class="fa-solid fa-flag-checkered"></i>
+          <span class="hidden md:inline">Finish</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       SCREEN 1: HOMEPAGE SCREEN (FITS 100% IN SMARTBOARD VIEWPORT)
+       ===================================================================== -->
+  <main id="homeScreen" class="flex-grow flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+    <div class="max-w-5xl w-full bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-indigo-200 p-5 sm:p-8 text-center relative overflow-hidden flex flex-col justify-between max-h-full">
+      <!-- Top Club Badge -->
+      <div>
+        <div class="inline-flex items-center gap-2 bg-indigo-100 text-indigo-800 font-extrabold px-4 py-1 rounded-full text-xs sm:text-sm mb-2 border border-indigo-200">
+          <i class="fa-solid fa-users-rays text-indigo-600"></i>
+          <span>English Society Smartboard Warm-Up Arena</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl lg:text-6xl font-display font-bold text-indigo-950 tracking-tight leading-none mb-2">
+          Welcome to <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-sky-500 to-emerald-500">UpWords Tryout!</span>
+        </h1>
+        <p class="text-sm sm:text-lg text-slate-600 font-bold max-w-2xl mx-auto">
+          Work Together as a Team, Stack Letters 3D-Style, and Build Simple English Words!
+        </p>
+      </div>
+
+      <!-- Interactive 3D Stacking Demo Widget on Homepage -->
+      <div class="bg-gradient-to-b from-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 max-w-3xl w-full mx-auto my-3 shadow-xl border-4 border-indigo-400/40 text-white">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <span class="text-xs sm:text-sm uppercase tracking-wider font-extrabold text-cyan-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group"></i> Tap Below to See How Stacking Works:
+          </span>
+          <button onclick="cycleHeroDemo()" class="btn-3d bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-bold px-3 py-1 rounded-xl shadow-[0_3px_0_#b45309] text-xs sm:text-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-hand-pointer"></i> Tap to Stack a Letter!
+          </button>
+        </div>
+
+        <!-- 3-Tile / 4-Tile Interactive Demo Row -->
+        <div id="heroDemoTiles" class="flex items-center justify-center gap-3 sm:gap-4 my-2 py-1">
+          <!-- Populated dynamically by JS -->
+        </div>
+
+        <p id="heroDemoCaption" class="text-xs sm:text-base text-amber-200 font-bold mt-1">
+          <!-- Populated dynamically by JS -->
+        </p>
+      </div>
+
+      <!-- 3-Step Mini Classroom Guide -->
+      <div class="grid grid-cols-3 gap-3 max-w-4xl w-full mx-auto my-2 text-left">
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-display font-bold text-xl flex items-center justify-center shrink-0 shadow-[0_3px_0_#b45309]">1</div>
+          <div>
+            <h3 class="font-display font-bold text-sm sm:text-base text-slate-900">Tap &amp; Place Letters</h3>
+            <p class="text-xs text-slate-600 font-semibold leading-tight">Build easy words like <strong>BUS</strong>, <strong>CAT</strong>, or <strong>PLAY</strong> with your team!</p>
+          </div>
+        </div>
+        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-400 text-slate-950 font-display font-bold text-xl flex items-center justify-center shrink-0 shadow-[0_3px_0_#047857]">2</div>
+          <div>
+            <h3 class="font-display font-bold text-sm sm:text-base text-slate-900">"It Can Be Stacked!"</h3>
+            <p class="text-xs text-slate-600 font-semibold leading-tight">Click <strong>Help Here!</strong> &amp; tap any word to see green stackable letter choices!</p>
+          </div>
+        </div>
+        <div class="bg-cyan-50 border-2 border-cyan-200 rounded-2xl p-3 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-400 text-slate-950 font-display font-bold text-xl flex items-center justify-center shrink-0 shadow-[0_3px_0_#0e7490]">3</div>
+          <div>
+            <h3 class="font-display font-bold text-sm sm:text-base text-slate-900">A–Z Letter Finder</h3>
+            <p class="text-xs text-slate-600 font-semibold leading-tight">No need to spell! Just tap starting letters like <strong>"S" "P"</strong> to see words!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Big Let's Play CTA -->
+      <div class="pt-2 flex justify-center">
+        <button onclick="goToSetupScreen()" class="btn-3d bg-gradient-to-b from-emerald-400 to-emerald-600 text-white font-display font-bold text-2xl sm:text-3xl px-10 py-3.5 rounded-3xl shadow-[0_7px_0_#065f46,0_12px_20px_rgba(16,185,129,0.35)] border-2 border-emerald-200 flex items-center gap-3 animate-float">
+          <i class="fa-solid fa-gamepad"></i>
+          <span>Let's Play!</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- =====================================================================
+       SCREEN 2: SETUP SCREEN (COMPACT, ZERO-SCROLL)
+       ===================================================================== -->
+  <section id="setupScreen" class="hidden flex-grow items-center justify-center p-3 sm:p-6 overflow-hidden">
+    <div class="max-w-5xl w-full bg-white rounded-3xl shadow-2xl border-4 border-indigo-200 p-5 sm:p-7 flex flex-col justify-between max-h-full">
+      <div class="flex items-center justify-between gap-4 border-b-2 border-slate-100 pb-3 mb-4">
+        <div>
+          <span class="text-xs font-extrabold uppercase tracking-widest text-indigo-600">Classroom Match Setup</span>
+          <h2 class="text-2xl sm:text-3xl font-display font-bold text-slate-900">Set Timer, Teams &amp; Starter Word</h2>
+        </div>
+        <button onclick="showScreen('homeScreen')" class="btn-3d bg-slate-100 hover:bg-slate-200 text-slate-700 font-display font-semibold px-4 py-2 rounded-xl shadow-[0_3px_0_#cbd5e1] text-sm flex items-center gap-2">
+          <i class="fa-solid fa-arrow-left"></i> Home
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 my-auto">
+        <!-- Left Column: Timer & Starter Board Options (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- 1. Set Timer Card -->
+          <div class="bg-indigo-50/80 border-2 border-indigo-200 rounded-2xl p-4">
+            <label class="block font-display font-bold text-lg text-indigo-950 mb-2 flex items-center gap-2">
+              <i class="fa-solid fa-stopwatch text-indigo-600"></i> 1. Activity Timer (Minutes)
+            </label>
+            <div class="grid grid-cols-4 gap-2 mb-3">
+              <button onclick="setTimerPreset(5)" class="timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-white text-indigo-900 border-2 border-indigo-200 shadow-[0_3px_0_#c7d2fe]" data-min="5">5m</button>
+              <button onclick="setTimerPreset(10)" class="timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-indigo-600 text-white border-2 border-indigo-700 shadow-[0_3px_0_#312e81]" data-min="10">10m</button>
+              <button onclick="setTimerPreset(15)" class="timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-white text-indigo-900 border-2 border-indigo-200 shadow-[0_3px_0_#c7d2fe]" data-min="15">15m</button>
+              <button onclick="setTimerPreset(20)" class="timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-white text-indigo-900 border-2 border-indigo-200 shadow-[0_3px_0_#c7d2fe]" data-min="20">20m</button>
+            </div>
+            <div class="flex items-center justify-between bg-white rounded-xl p-2 border-2 border-indigo-200">
+              <button onclick="adjustCustomMinutes(-1)" class="btn-3d w-9 h-9 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-lg shadow-[0_2px_0_#a5b4fc]">-</button>
+              <div class="text-center">
+                <span id="setupMinutesVal" class="font-display font-bold text-2xl text-indigo-950">10</span>
+                <span class="text-xs font-bold text-slate-500 ml-1">Minutes</span>
+              </div>
+              <button onclick="adjustCustomMinutes(1)" class="btn-3d w-9 h-9 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold text-lg shadow-[0_2px_0_#a5b4fc]">+</button>
+            </div>
+          </div>
+
+          <!-- 2. Starter Word Mode Card -->
+          <div class="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-4">
+            <label class="block font-display font-bold text-lg text-amber-950 mb-1.5 flex items-center gap-2">
+              <i class="fa-solid fa-cubes-stacked text-amber-600"></i> 2. Starting Word on Board
+            </label>
+            <p class="text-xs font-bold text-amber-800 mb-2">
+              Pick an easy primary school word on the board so teams can stack right away!
+            </p>
+            <select id="starterWordSelect" class="w-full bg-white border-2 border-amber-300 rounded-xl px-3 py-2 font-display font-bold text-sm text-slate-800 focus:outline-none focus:border-amber-500">
+              <option value="BUS" selected>Starter Word: B U S (Stack BUG, BUN, BUY, BUT, SUN...)</option>
+              <option value="CAT">Starter Word: C A T (Stack BAT, HAT, MAT, RAT, CAR, CAN...)</option>
+              <option value="PLAY">Starter Word: P L A Y (Stack CLAY, STAY, PLAN...)</option>
+              <option value="BOOK">Starter Word: B O O K (Stack COOK, LOOK, BOOT, FOOT...)</option>
+              <option value="CAKE">Starter Word: C A K E (Stack BAKE, LAKE, MAKE, TAKE...)</option>
+              <option value="STOP">Starter Word: S T O P (Stack SHOP, SHIP, STEP, STAR...)</option>
+              <option value="EMPTY">Empty Board (Team 1 builds the first word)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Right Column: Number of Teams & Team Names (7 cols) -->
+        <div class="lg:col-span-7 bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 flex flex-col justify-between">
+          <div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <label class="font-display font-bold text-lg text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-people-group text-emerald-600"></i> 3. Number of Teams
+              </label>
+              <div class="flex items-center gap-1.5 bg-white p-1 rounded-xl border-2 border-slate-200">
+                <button onclick="setTeamCount(2)" class="team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm transition" data-count="2">2</button>
+                <button onclick="setTeamCount(3)" class="team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm transition" data-count="3">3</button>
+                <button onclick="setTeamCount(4)" class="team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm transition" data-count="4">4</button>
+                <button onclick="setTeamCount(5)" class="team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm transition" data-count="5">5</button>
+                <button onclick="setTeamCount(6)" class="team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm transition" data-count="6">6</button>
+              </div>
+            </div>
+
+            <!-- Dynamic Team Name Inputs Grid -->
+            <div id="teamSetupList" class="grid grid-cols-2 gap-2.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <p class="text-[11px] font-bold text-slate-500 mt-3">
+            <i class="fa-solid fa-circle-info text-indigo-500 mr-1"></i> Teams take turns helping each other at the Smartboard until the timer finishes!
+          </p>
+        </div>
+      </div>
+
+      <!-- Bottom Launch Button -->
+      <div class="flex justify-center pt-4">
+        <button onclick="startGame()" class="btn-3d bg-gradient-to-b from-amber-400 to-orange-500 text-slate-950 font-display font-bold text-2xl sm:text-3xl px-12 py-3 rounded-3xl shadow-[0_6px_0_#b45309,0_10px_20px_rgba(245,158,11,0.35)] border-2 border-amber-200 flex items-center gap-3">
+          <i class="fa-solid fa-rocket"></i>
+          <span>Let's Go! Start Game</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SCREEN 3: MAIN GAMEPLAY SCREEN (ZERO-SCROLL 3-COLUMN DASHBOARD)
+       ===================================================================== -->
+  <section id="gameScreen" class="hidden flex-grow p-2 sm:p-3 max-w-[1800px] w-full mx-auto overflow-hidden">
+    <div class="grid grid-cols-12 gap-3 h-full items-stretch">
+
+      <!-- LEFT COLUMN (3 cols): TEAM SCOREBOARD + QUICK STACK CHECKER LAUNCHER -->
+      <div class="col-span-3 flex flex-col justify-between gap-2.5 h-full overflow-hidden">
+        <!-- Team Scoreboard Card -->
+        <div class="bg-white/95 rounded-2xl shadow-lg border-3 border-indigo-200 p-3 flex flex-col overflow-hidden">
+          <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-100 shrink-0">
+            <h3 class="font-display font-bold text-base text-indigo-950 flex items-center gap-1.5">
+              <i class="fa-solid fa-trophy text-amber-500"></i> Team Scores
+            </h3>
+            <span id="roundNumberBadge" class="text-[11px] font-extrabold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Round 1</span>
+          </div>
+          <div id="scoreboardList" class="space-y-1.5 flex-grow flex flex-col justify-center">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- 1-Tap "Can We Stack This Word?" Card on Left Panel -->
+        <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl shadow-lg p-3 border-2 border-emerald-300 shrink-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="w-7 h-7 rounded-lg bg-white text-emerald-700 flex items-center justify-center font-bold text-sm shrink-0">
+              <i class="fa-solid fa-layer-group"></i>
+            </span>
+            <h4 class="font-display font-bold text-sm sm:text-base leading-tight">Unsure What to Stack?</h4>
+          </div>
+          <p class="text-[11px] text-emerald-100 font-semibold mb-2 leading-snug">
+            Tap below, click any word on the board, and see the green <strong>"It Can Be Stacked!"</strong> helper!
+          </p>
+          <button onclick="openHelpModal('stack')" class="w-full btn-3d bg-amber-300 hover:bg-amber-200 text-slate-950 font-display font-bold text-xs sm:text-sm py-2 rounded-xl shadow-[0_3px_0_#b45309] flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Check Word to Stack!
+          </button>
+        </div>
+
+        <!-- Mini Scoring Reminder -->
+        <div class="bg-indigo-950 text-white rounded-2xl p-2.5 border border-indigo-700 shrink-0 text-[11px] space-y-1 font-semibold">
+          <div class="flex items-center justify-between">
+            <span class="text-amber-300 font-extrabold">Flat Word (x1):</span>
+            <span>2 pts per letter</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-cyan-300 font-extrabold">Stacked Word (x2–x5):</span>
+            <span>1 pt per tile (+ buried!)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER COLUMN (6 cols): STATUS BAR + 8x8 UPWORDS GRID + TEAM RACK -->
+      <div class="col-span-6 flex flex-col items-center justify-between h-full overflow-hidden">
+
+        <!-- Status / Feedback Message Bar above Board -->
+        <div id="boardFeedbackBar" class="w-full bg-white/95 border-2 border-indigo-200 rounded-2xl px-3.5 py-1.5 shadow flex items-center justify-between gap-2 shrink-0 min-h-[42px]">
+          <div class="flex items-center gap-2 min-w-0">
+            <span id="feedbackIcon" class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0">
+              <i class="fa-solid fa-hand-pointer"></i>
+            </span>
+            <p id="feedbackText" class="text-xs sm:text-sm font-extrabold text-slate-800 truncate">
+              Tap a letter tile below, then tap any square on the board to stack or build a word!
+            </p>
+          </div>
+          <!-- Teacher 1-Click Override Button -->
+          <button id="teacherOverrideBtn" onclick="submitTurn(true)" class="hidden btn-3d bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-bold text-xs px-2.5 py-1 rounded-xl shadow-[0_2px_0_#b45309] border border-amber-600 items-center gap-1 shrink-0">
+            <i class="fa-solid fa-check"></i> Teacher: Accept Word
+          </button>
+        </div>
+
+        <!-- THE 8x8 UPWORDS 3D BOARD CONTAINER (Automatically scales to fit height) -->
+        <div class="smartboard-grid-wrapper bg-gradient-to-b from-indigo-950 to-slate-900 p-2 sm:p-3 rounded-3xl shadow-2xl border-4 border-indigo-400/50 flex flex-col justify-center my-auto">
+          <!-- Column Headers (A to H) -->
+          <div class="grid grid-cols-8 gap-1 px-1 mb-0.5 text-center shrink-0">
+            <span class="text-[10px] font-extrabold text-indigo-300/80">A</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">B</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">C</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">D</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">E</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">F</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">G</span>
+            <span class="text-[10px] font-extrabold text-indigo-300/80">H</span>
+          </div>
+
+          <!-- 8x8 Grid Cells -->
+          <div id="upwordsGrid" class="grid grid-cols-8 gap-1 sm:gap-1.5 flex-grow">
+            <!-- 64 cells generated dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- TEAM LETTER RACK & ACTION CONTROLS (Compact Bottom Dock) -->
+        <div class="w-full bg-white/95 rounded-2xl shadow-xl border-3 border-amber-300 px-3 py-2 shrink-0">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                <i class="fa-solid fa-grip-lines mr-1"></i><span id="rackOwnerLabel">Team 1's Rack</span>
+              </span>
+              <span id="liveTurnScorePreview" class="hidden text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                Move: +0 pts
+              </span>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="openHelpModal('stack')" class="text-xs font-extrabold text-emerald-700 hover:text-emerald-900 underline flex items-center gap-1">
+                <i class="fa-solid fa-layer-group"></i> Stack Hint
+              </button>
+              <button onclick="openHelpModal('dict')" class="text-xs font-extrabold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1">
+                <i class="fa-solid fa-spell-check"></i> A-Z Word Finder
+              </button>
+            </div>
+          </div>
+
+          <!-- Rack + Action Buttons in a single compact row on wide screens, or tight 2-row dock -->
+          <div class="grid grid-cols-12 gap-2 items-center">
+            <!-- 7 Letter Tiles Container (7 cols) -->
+            <div id="letterRackContainer" class="col-span-7 grid grid-cols-7 gap-1.5 py-1">
+              <!-- 7 Rack Tiles populated by JS -->
+            </div>
+
+            <!-- Action Buttons (5 cols) -->
+            <div class="col-span-5 grid grid-cols-3 gap-1.5">
+              <!-- Submit Word -->
+              <button onclick="submitTurn(false)" id="submitWordBtn" class="col-span-3 btn-3d bg-gradient-to-b from-emerald-400 to-emerald-600 text-white font-display font-bold text-sm sm:text-base py-1.5 px-3 rounded-xl shadow-[0_4px_0_#065f46] border border-emerald-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-circle-check"></i>
+                <span>Submit Word!</span>
+              </button>
+
+              <!-- Recall -->
+              <button onclick="recallPendingTiles()" class="btn-3d bg-slate-100 hover:bg-slate-200 text-slate-800 font-display font-semibold text-xs py-1.5 px-2 rounded-xl shadow-[0_3px_0_#94a3b8] border border-slate-300 flex items-center justify-center gap-1" title="Return placed tiles to rack">
+                <i class="fa-solid fa-rotate-left text-sky-600"></i>
+                <span>Recall</span>
+              </button>
+
+              <!-- New Tiles -->
+              <button onclick="swapNewRackLetters()" class="btn-3d bg-amber-100 hover:bg-amber-200 text-amber-950 font-display font-semibold text-xs py-1.5 px-2 rounded-xl shadow-[0_3px_0_#d97706] border border-amber-300 flex items-center justify-center gap-1" title="Get 7 fresh letters">
+                <i class="fa-solid fa-arrows-rotate text-amber-700"></i>
+                <span>New Letters</span>
+              </button>
+
+              <!-- Pass Turn -->
+              <button onclick="passTurnToNextTeam()" class="btn-3d bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-display font-semibold text-xs py-1.5 px-2 rounded-xl shadow-[0_3px_0_#6366f1] border border-indigo-300 flex items-center justify-center gap-1" title="Next Team">
+                <i class="fa-solid fa-forward-step text-indigo-700"></i>
+                <span>Pass</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN (3 cols): BOARD WORDS (TAP TO STACK!) & WORDS HISTORY -->
+      <div class="col-span-3 flex flex-col justify-between gap-2.5 h-full overflow-hidden">
+        <!-- Words Currently on Board (Click Any Word to Check If It Can Be Stacked!) -->
+        <div class="bg-white/95 rounded-2xl shadow-lg border-3 border-emerald-300 p-3 shrink-0">
+          <h3 class="font-display font-bold text-sm sm:text-base text-emerald-950 mb-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-cubes-stacked text-emerald-600"></i> Words on Board (Tap to Stack!)
+          </h3>
+          <p class="text-[11px] font-bold text-slate-500 mb-2">
+            Tap any word below to see how your team can stack a letter on it:
+          </p>
+          <div id="liveBoardWordsPills" class="flex flex-wrap gap-1.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Stack Inspector Box -->
+        <div class="bg-white/95 rounded-2xl shadow-lg border-3 border-cyan-200 p-3 shrink-0">
+          <h3 class="font-display font-bold text-sm text-slate-900 mb-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-magnifying-glass-plus text-cyan-600"></i> Tile Stack Inspector
+          </h3>
+          <div id="stackInspectorContent" class="bg-slate-50 rounded-xl p-2 border border-slate-200 text-xs text-slate-600 font-semibold leading-snug">
+            Tap or hover any tile on the board to inspect buried letters underneath!
+          </div>
+        </div>
+
+        <!-- Recent Words Built (Paginated / Compact List - No Scrollbar Needed) -->
+        <div class="bg-white/95 rounded-2xl shadow-lg border-3 border-indigo-200 p-3 flex flex-col flex-grow justify-between overflow-hidden">
+          <div>
+            <div class="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100">
+              <h3 class="font-display font-bold text-sm sm:text-base text-indigo-950 flex items-center gap-1.5">
+                <i class="fa-solid fa-book-open-reader text-indigo-600"></i> Words Built
+              </h3>
+              <span id="totalWordsCountBadge" class="text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">0 words</span>
+            </div>
+            <div id="wordHistoryList" class="space-y-1.5 overflow-hidden">
+              <!-- Shows latest 4 words -->
+            </div>
+          </div>
+          <button onclick="openHelpModal('dict')" class="w-full mt-2 btn-3d bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-display font-bold text-xs py-1.5 rounded-xl border border-indigo-200 flex items-center justify-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-magnifying-glass"></i> Open A–Z Starting Letter Finder
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       SCREEN 4: TIME'S UP / WINNER PODIUM SCREEN (ZERO-SCROLL)
+       ===================================================================== -->
+  <section id="winnerScreen" class="hidden flex-grow items-center justify-center p-4 overflow-hidden">
+    <div class="max-w-4xl w-full bg-white rounded-3xl shadow-2xl border-4 border-amber-300 p-6 sm:p-8 text-center">
+      <div class="inline-flex items-center gap-2 bg-amber-100 text-amber-900 font-extrabold px-4 py-1 rounded-full text-xs sm:text-sm mb-2 border border-amber-300">
+        <i class="fa-solid fa-crown text-amber-500"></i>
+        <span>English Society UpWords Tryout Results!</span>
+      </div>
+      <h2 class="text-3xl sm:text-5xl font-display font-bold text-indigo-950 mb-1">Time's Up! Awesome Teamwork!</h2>
+      <p class="text-sm sm:text-base text-slate-600 font-bold mb-5">Now every group is ready for the physical UpWords board game!</p>
+
+      <!-- Podium Standings -->
+      <div id="podiumContainer" class="grid grid-cols-3 gap-4 mb-5 items-end">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Session Highlights -->
+      <div id="sessionStatsRow" class="grid grid-cols-3 gap-3 max-w-2xl mx-auto mb-6">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Replay or Home Buttons -->
+      <div class="flex items-center justify-center gap-4">
+        <button onclick="goToSetupScreen()" class="btn-3d bg-gradient-to-b from-emerald-400 to-emerald-600 text-white font-display font-bold text-lg px-7 py-3 rounded-2xl shadow-[0_5px_0_#065f46] flex items-center gap-2">
+          <i class="fa-solid fa-rotate-right"></i> Play Again
+        </button>
+        <button onclick="showScreen('homeScreen')" class="btn-3d bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-display font-bold text-lg px-7 py-3 rounded-2xl shadow-[0_5px_0_#a5b4fc] flex items-center gap-2">
+          <i class="fa-solid fa-house"></i> Home
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       MODAL 1: "HELP HERE!" (NO-SCROLL SMARTBOARD ASSISTANT)
+       TAB 1: CLICK A WORD TO STACK -> GREEN "IT CAN BE STACKED!" POP-UP
+       TAB 2: TAP STARTING LETTERS (e.g. "S" "P") WORD FINDER DICTIONARY
+       ===================================================================== -->
+  <div id="helpModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-40 flex items-center justify-center p-3 sm:p-5 overflow-hidden">
+    <div class="bg-white w-full max-w-5xl rounded-3xl shadow-2xl border-4 border-amber-400 overflow-hidden flex flex-col h-[90vh] max-h-[690px] animate-pop">
+
+      <!-- Modal Header -->
+      <div class="bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-300 px-5 py-3 flex items-center justify-between border-b-4 border-amber-500 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-white text-amber-600 flex items-center justify-center text-xl shadow">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h3 class="font-display font-bold text-xl sm:text-2xl text-slate-950 leading-none">Help Here! Team Assistant</h3>
+            <p class="text-xs font-extrabold text-amber-950/80">100% Touch-Friendly • Easy Primary School Words • Live Internet Connected</p>
+          </div>
+        </div>
+        <button onclick="closeHelpModal()" class="btn-3d px-4 py-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-display font-bold text-base shadow-[0_3px_0_#881337] flex items-center gap-1.5">
+          <i class="fa-solid fa-xmark"></i> Close
+        </button>
+      </div>
+
+      <!-- Modal Tabs -->
+      <div class="flex border-b-2 border-slate-200 bg-slate-100 px-5 pt-2 gap-2 shrink-0">
+        <button onclick="switchHelpTab('stack')" id="tabBtnStack" class="px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-white text-emerald-900 border-slate-200 -mb-[2px]">
+          <i class="fa-solid fa-layer-group text-emerald-600"></i>
+          <span>1. Stack Checker &amp; Easy Hint ("It Can Be Stacked!")</span>
+        </button>
+        <button onclick="switchHelpTab('dict')" id="tabBtnDict" class="px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-slate-200/70 text-slate-600 border-transparent">
+          <i class="fa-solid fa-spell-check text-indigo-600"></i>
+          <span>2. Starting-Letter Word Finder (Tap Letters like "S" "P")</span>
+        </button>
+      </div>
+
+      <!-- Modal Body (Locked height, no vertical scrolling needed!) -->
+      <div class="p-4 sm:p-5 flex-grow flex flex-col justify-between overflow-hidden">
+
+        <!-- ===============================================================
+             TAB 1: INTERACTIVE STACK CHECKER & EASY HINTS
+             =============================================================== -->
+        <div id="helpTabStackContent" class="flex flex-col justify-between h-full overflow-hidden">
+
+          <!-- Step 1: Click which word on the board you want to stack! -->
+          <div class="bg-slate-50 border-2 border-slate-200 rounded-2xl p-3 shrink-0">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="bg-indigo-600 text-white font-display font-bold text-xs px-2.5 py-1 rounded-lg uppercase">Step 1</span>
+                <span class="font-display font-bold text-base text-slate-900">Click the Word You Want to Stack On:</span>
+              </div>
+              <!-- Quick custom word check input if they want to test any word -->
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-bold text-slate-500">Or test word:</span>
+                <input id="customStackWordInput" type="text" maxlength="6" placeholder="e.g. BUS" class="w-24 px-2.5 py-1 rounded-lg border-2 border-indigo-200 font-display font-bold text-sm uppercase text-slate-900 focus:outline-none focus:border-indigo-500" />
+                <button onclick="inspectWordForStacking(document.getElementById('customStackWordInput').value, null)" class="btn-3d bg-indigo-600 text-white font-display font-bold text-xs px-3 py-1.5 rounded-lg shadow-[0_2px_0_#312e81]">Check</button>
+              </div>
+            </div>
+
+            <!-- Clickable Board Word Pills -->
+            <div id="stackModalBoardWords" class="flex flex-wrap items-center gap-2 mt-2.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Step 2: BIG GREEN "IT CAN BE STACKED!" POP-UP BANNER -->
+          <div id="greenStackableBanner" class="my-2.5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white rounded-2xl px-4 py-2.5 shadow-lg border-3 border-emerald-200 flex items-center justify-between shrink-0 green-stack-banner">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center text-2xl font-bold shadow shrink-0">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span id="stackBannerTitle" class="font-display font-bold text-lg sm:text-xl tracking-wide uppercase">✅ IT CAN BE STACKED!</span>
+                  <span id="stackBannerTargetWord" class="bg-white/25 px-2.5 py-0.5 rounded-full font-display font-bold text-xs sm:text-sm">Word: BUS</span>
+                </div>
+                <p id="stackBannerSubtitle" class="text-xs sm:text-sm font-bold text-emerald-50">
+                  Choose any easy word or letter option below to stack on top!
+                </p>
+              </div>
+            </div>
+
+            <!-- Pagination Controls for Stack Choices (Zero Scroll!) -->
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button onclick="changeStackHintPage(-1)" id="stackPrevBtn" class="btn-3d bg-white/90 hover:bg-white text-emerald-950 font-display font-bold text-xs px-3 py-1.5 rounded-xl shadow-[0_2px_0_#065f46]">
+                <i class="fa-solid fa-chevron-left"></i> Prev
+              </button>
+              <span id="stackPageIndicator" class="text-xs font-extrabold px-2">1 / 2</span>
+              <button onclick="changeStackHintPage(1)" id="stackNextBtn" class="btn-3d bg-white/90 hover:bg-white text-emerald-950 font-display font-bold text-xs px-3 py-1.5 rounded-xl shadow-[0_2px_0_#065f46]">
+                Next <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 3: 3 Clear Visual Hint & Word/Letter Choice Cards -->
+          <div id="stackChoicesGrid" class="grid grid-cols-3 gap-3 flex-grow items-stretch">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- ===============================================================
+             TAB 2: STARTING-LETTER PREFIX DICTIONARY (TAP "S" "P" -> WORDS)
+             =============================================================== -->
+        <div id="helpTabDictContent" class="hidden flex-col justify-between h-full overflow-hidden">
+
+          <!-- Top Prefix Builder & A-Z Tap Keypad -->
+          <div class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-3 shrink-0 space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <!-- Current Starting Letters Display -->
+              <div class="flex items-center gap-2">
+                <span class="font-display font-bold text-sm sm:text-base text-indigo-950">
+                  Starting Letters:
+                </span>
+                <div id="prefixSlotsContainer" class="flex items-center gap-1.5">
+                  <!-- Shows tapped letters like [ S ] [ P ] -->
+                </div>
+                <button onclick="backspacePrefixLetter()" class="btn-3d bg-amber-200 hover:bg-amber-300 text-amber-950 font-display font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-[0_2px_0_#b45309]" title="Remove Last Letter">
+                  <i class="fa-solid fa-delete-left"></i> Back
+                </button>
+                <button onclick="clearPrefixLetters()" class="btn-3d bg-rose-100 hover:bg-rose-200 text-rose-900 font-display font-bold text-xs px-2.5 py-1.5 rounded-lg shadow-[0_2px_0_#e11d48]">
+                  Clear
+                </button>
+              </div>
+
+              <!-- Quick Team Rack Letter Shortcut -->
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-extrabold text-indigo-700">Your Team Rack:</span>
+                <div id="dictRackQuickButtons" class="flex items-center gap-1">
+                  <!-- Populated by JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 26-Letter A-Z Touch Keypad (2 clean rows of 13 letters for Smartboard) -->
+            <div id="azTouchKeypad" class="grid grid-cols-13 gap-1 pt-1">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- Middle Status & Pagination Bar -->
+          <div class="flex items-center justify-between my-2 px-1 shrink-0">
+            <div class="flex items-center gap-2">
+              <span id="dictMatchingHeading" class="font-display font-bold text-base sm:text-lg text-indigo-950">
+                Words Starting With "SP..."
+              </span>
+              <span id="dictOnlineStatusBadge" class="text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                <i class="fa-solid fa-check-circle mr-1"></i>Primary School + Online Words
+              </span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button onclick="changeDictPage(-1)" id="dictPrevBtn" class="btn-3d bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-display font-bold text-xs px-3 py-1.5 rounded-xl shadow-[0_2px_0_#6366f1]">
+                <i class="fa-solid fa-chevron-left"></i> Prev Page
+              </button>
+              <span id="dictPageIndicator" class="text-xs font-extrabold text-slate-600">Page 1 / 1</span>
+              <button onclick="changeDictPage(1)" id="dictNextBtn" class="btn-3d bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-display font-bold text-xs px-3 py-1.5 rounded-xl shadow-[0_2px_0_#6366f1]">
+                Next Page <i class="fa-solid fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Paginated 6-Card Grid of Matching Words (Zero Scroll!) -->
+          <div id="prefixWordsGrid" class="grid grid-cols-3 gap-3 flex-grow items-stretch">
+            <!-- Populated by JS -->
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 2: QUICK VISUAL RULES MODAL (ZERO-SCROLL)
+       ===================================================================== -->
+  <div id="rulesModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-40 flex items-center justify-center p-4 overflow-hidden">
+    <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border-4 border-indigo-400 overflow-hidden animate-pop">
+      <div class="bg-indigo-950 text-white px-6 py-3.5 flex items-center justify-between">
+        <h3 class="font-display font-bold text-xl flex items-center gap-2">
+          <i class="fa-solid fa-cubes-stacked text-amber-400"></i> How to Play UpWords Tryout!
+        </h3>
+        <button onclick="closeRulesModal()" class="w-8 h-8 rounded-xl bg-indigo-800 hover:bg-indigo-700 text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 text-slate-700 font-semibold text-sm">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3.5">
+            <h4 class="font-display font-bold text-base text-amber-950 mb-1">1. Build Across or Down</h4>
+            <p class="text-xs leading-relaxed">Spell simple English words left-to-right or top-to-bottom (like <strong>BUS</strong>, <strong>CAT</strong>, <strong>PLAY</strong>, <strong>STAR</strong>).</p>
+          </div>
+          <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3.5">
+            <h4 class="font-display font-bold text-base text-emerald-950 mb-1">2. Stack Letters on Top!</h4>
+            <p class="text-xs leading-relaxed">Put a new letter <strong>on top of an old letter</strong> to change the word! (Example: Stack <strong>G</strong> on <strong>S</strong> in <em>BUS</em> to make <em>BUG</em>!)</p>
+          </div>
+          <div class="bg-cyan-50 border-2 border-cyan-200 rounded-2xl p-3.5">
+            <h4 class="font-display font-bold text-base text-cyan-950 mb-1">3. Green Stack Checker</h4>
+            <p class="text-xs leading-relaxed">Click <strong>"Help Here!"</strong> and tap any word on the board. A green <strong>"It Can Be Stacked!"</strong> box will show you easy hints and letter choices!</p>
+          </div>
+          <div class="bg-purple-50 border-2 border-purple-200 rounded-2xl p-3.5">
+            <h4 class="font-display font-bold text-base text-purple-950 mb-1">4. A–Z Letter Finder</h4>
+            <p class="text-xs leading-relaxed">Not sure how to spell a word? Tap 1 or 2 starting letters (like <strong>"S" "P"</strong>) in the Dictionary tab to see a list of words!</p>
+          </div>
+        </div>
+        <div class="text-center pt-1">
+          <button onclick="closeRulesModal()" class="btn-3d bg-indigo-600 text-white font-display font-bold px-8 py-2 rounded-xl shadow-[0_4px_0_#312e81]">Got It!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       JAVASCRIPT: BGM, SFX, INTERNET DICTIONARY, GREEN STACK CHECKER & GAME
+       ===================================================================== -->
+  <script>
+    /*************************************************************************
+     * 1. BACKGROUND MUSIC (ASTRO'S PLAYROOM OST) & WEB AUDIO SFX ENGINE
+     *************************************************************************/
+    let audioCtx = null;
+    let isSfxMuted = false;
+    let isBgmMuted = false;
+    let bgmStarted = false;
+
+    function getBgmElement() {
+      return document.getElementById('bgmAudio');
+    }
+
+    function tryStartBgm() {
+      const bgm = getBgmElement();
+      if (!bgm) return;
+      bgm.volume = parseInt(document.getElementById('bgmVolumeSlider').value || '35', 10) / 100;
+      if (!isBgmMuted && bgm.paused) {
+        bgm.play().then(() => {
+          bgmStarted = true;
+          updateBgmButtonUI();
+        }).catch(() => {
+          // Browser autoplay policy waiting for next tap
+        });
+      }
+    }
+
+    function toggleBgm() {
+      const bgm = getBgmElement();
+      if (!bgm) return;
+      isBgmMuted = !isBgmMuted;
+      bgm.muted = isBgmMuted;
+      if (!isBgmMuted) {
+        bgm.volume = parseInt(document.getElementById('bgmVolumeSlider').value || '35', 10) / 100;
+        bgm.play().catch(() => {});
+      } else {
+        bgm.pause();
+      }
+      playPop(520);
+      updateBgmButtonUI();
+    }
+
+    function changeBgmVolume(val) {
+      const bgm = getBgmElement();
+      if (!bgm) return;
+      bgm.volume = parseInt(val, 10) / 100;
+      if (bgm.volume > 0 && isBgmMuted) {
+        isBgmMuted = false;
+        bgm.muted = false;
+        bgm.play().catch(() => {});
+      }
+      updateBgmButtonUI();
+    }
+
+    function updateBgmButtonUI() {
+      const btn = document.getElementById('bgmToggleBtn');
+      const icon = document.getElementById('bgmIcon');
+      const label = document.getElementById('bgmLabel');
+      if (isBgmMuted) {
+        btn.className = "px-2.5 py-1 rounded-lg font-display font-bold text-xs flex items-center gap-1.5 transition bg-rose-600 text-white";
+        icon.className = "fa-solid fa-volume-xmark";
+        label.textContent = "Music: OFF";
+      } else {
+        btn.className = "px-2.5 py-1 rounded-lg font-display font-bold text-xs flex items-center gap-1.5 transition bg-emerald-600 text-white";
+        icon.className = "fa-solid fa-music animate-pulse";
+        label.textContent = "Music: ON";
+      }
+    }
+
+    function initAudio() {
+      tryStartBgm();
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function toggleSfxMute() {
+      isSfxMuted = !isSfxMuted;
+      const icon = document.getElementById('soundToggleIcon');
+      if (isSfxMuted) {
+        icon.className = 'fa-solid fa-bell-slash text-rose-400';
+      } else {
+        icon.className = 'fa-solid fa-volume-high text-cyan-300';
+        playPop(520);
+      }
+    }
+
+    function playPop(freq = 460) {
+      if (isSfxMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.45, now + 0.08);
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.09);
+    }
+
+    function playStackSound(stackHeight = 1) {
+      if (isSfxMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const scaleFreqs = [392.00, 440.00, 523.25, 659.25, 783.99];
+      const freq = scaleFreqs[Math.min(Math.max(stackHeight - 1, 0), 4)];
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.05, now + 0.16);
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.22);
+    }
+
+    function playBoing() {
+      if (isSfxMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.linearRampToValueAtTime(130, now + 0.24);
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.26);
+    }
+
+    function playMagicChime() {
+      if (isSfxMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      notes.forEach((f, idx) => {
+        const now = audioCtx.currentTime + idx * 0.055;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, now);
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      });
+    }
+
+    function playFanfare() {
+      if (isSfxMuted) return;
+      initAudio();
+      if (!audioCtx) return;
+      const notes = [523.25, 659.25, 783.99, 1046.50];
+      const delays = [0, 0.08, 0.16, 0.25];
+      notes.forEach((f, idx) => {
+        const now = audioCtx.currentTime + delays[idx];
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now);
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (idx === 3 ? 0.5 : 0.18));
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + (idx === 3 ? 0.5 : 0.18));
+      });
+    }
+
+    function speakWordAloud(word) {
+      playPop(600);
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(word.toLowerCase());
+        utter.lang = 'en-GB';
+        utter.rate = 0.88;
+        window.speechSynthesis.speak(utter);
+      }
+    }
+
+    /*************************************************************************
+     * 2. PRIMARY SCHOOL SIMPLE DICTIONARY & CURATED EASY HINTS
+     *    (Includes BUS, CAT, DOG, SUN, CUP, CAR, VAN, etc. + Live Internet!)
+     *************************************************************************/
+    const PRIMARY_DEFINITIONS = {
+      // Easy 3-Letter Primary School Favorites
+      "BUS": { pos: "noun", def: "A big road vehicle that carries many passengers or school children." },
+      "BUG": { pos: "noun", def: "A tiny insect that crawls or flies, like a beetle or ladybug." },
+      "BUN": { pos: "noun", def: "A small, soft, round bread roll." },
+      "BUT": { pos: "word", def: "Used to join two different ideas in a sentence." },
+      "BUY": { pos: "verb", def: "To get something by paying money at a shop." },
+      "BUD": { pos: "noun", def: "A baby flower or leaf before it opens up." },
+      "CAT": { pos: "noun", def: "A small furry pet with whiskers that says meow." },
+      "BAT": { pos: "noun", def: "An animal that flies at night, or a stick used to hit a ball." },
+      "HAT": { pos: "noun", def: "Something you wear on your head under the hot sun." },
+      "MAT": { pos: "noun", def: "A small rug on the floor for wiping your shoes." },
+      "RAT": { pos: "noun", def: "A small animal with a long tail, like a big mouse." },
+      "FAT": { pos: "adjective", def: "Chubby or thick in size." },
+      "SAT": { pos: "verb", def: "Rested on a chair or seat." },
+      "PAT": { pos: "verb", def: "To touch gently with your flat hand." },
+      "CAR": { pos: "noun", def: "A road vehicle with four wheels and an engine." },
+      "CAN": { pos: "verb/noun", def: "To be able to do something, or a metal tin for drinks." },
+      "CAP": { pos: "noun", def: "A soft hat with a curved visor in front." },
+      "CAB": { pos: "noun", def: "A taxi car that carries passengers." },
+      "CUP": { pos: "noun", def: "A small round container with a handle used for drinking tea or water." },
+      "CUT": { pos: "verb", def: "To divide paper or food using scissors or a knife." },
+      "CUB": { pos: "noun", def: "A baby lion, bear, or tiger." },
+      "PUP": { pos: "noun", def: "A young baby dog (puppy)." },
+      "DOG": { pos: "noun", def: "A friendly pet with four legs that barks and wags its tail." },
+      "LOG": { pos: "noun", def: "A thick piece of wood from a tree trunk." },
+      "JOG": { pos: "verb", def: "To run slowly for exercise." },
+      "FOG": { pos: "noun", def: "Thick cloud floating low near the ground." },
+      "DIG": { pos: "verb", def: "To make a hole in the soil or sand." },
+      "BIG": { pos: "adjective", def: "Large in size; not small." },
+      "PIG": { pos: "noun", def: "A pink farm animal with a curly tail." },
+      "WIG": { pos: "noun", def: "Fake hair worn on the head for a costume." },
+      "FIG": { pos: "noun", def: "A soft, sweet purple fruit full of tiny seeds." },
+      "SUN": { pos: "noun", def: "The bright star that gives us light and warmth during the day." },
+      "RUN": { pos: "verb", def: "To move very fast on your feet." },
+      "FUN": { pos: "noun", def: "Enjoyment, playfulness, and happy times!" },
+      "FAN": { pos: "noun", def: "A machine with spinning blades that blows cool air." },
+      "PAN": { pos: "noun", def: "A flat metal dish used for frying eggs or pancakes." },
+      "MAN": { pos: "noun", def: "An adult male person." },
+      "VAN": { pos: "noun", def: "A medium-sized vehicle used for carrying school pupils or boxes." },
+      "RAN": { pos: "verb", def: "Moved quickly on foot (past tense of run)." },
+      "TAN": { pos: "noun/adj", def: "A light brown color." },
+      "PEN": { pos: "noun", def: "A classroom tool filled with ink for writing." },
+      "HEN": { pos: "noun", def: "A mother chicken on a farm that lays eggs." },
+      "TEN": { pos: "number", def: "The number 10 (one more than nine)." },
+      "MEN": { pos: "noun", def: "More than one adult man." },
+      "DEN": { pos: "noun", def: "The secret home of a wild lion or bear." },
+      "BED": { pos: "noun", def: "A piece of furniture with a pillow and blanket where you sleep." },
+      "RED": { pos: "noun/adj", def: "The bright color of a ripe strawberry or fire truck." },
+      "FED": { pos: "verb", def: "Gave food to a pet or person." },
+      "LED": { pos: "verb", def: "Guided or showed the way." },
+      "LEG": { pos: "noun", def: "The part of your body used for standing, walking, and running." },
+      "PEG": { pos: "noun", def: "A clip or hook used for hanging clothes or bags." },
+      "BEG": { pos: "verb", def: "To ask politely and eagerly for something." },
+      "EGG": { pos: "noun", def: "An oval food laid by a hen that we fry or boil for breakfast." },
+      "BAG": { pos: "noun", def: "Something you use to carry your school books and pencil box." },
+      "TAG": { pos: "noun", def: "A chasing game in the playground, or a small name label." },
+      "RAG": { pos: "noun", def: "A piece of old cloth used for wiping tables." },
+      "WAG": { pos: "verb", def: "When a happy dog shakes its tail side to side." },
+      "BOX": { pos: "noun", def: "A square container made of cardboard or wood." },
+      "FOX": { pos: "noun", def: "A wild animal like a dog with red fur and a bushy tail." },
+      "OX": { pos: "noun", def: "A large, strong farm bull." },
+      "TOP": { pos: "noun", def: "The highest point of something, or a spinning toy." },
+      "MOP": { pos: "noun", def: "A stick with wet strings used to clean the floor." },
+      "HOP": { pos: "verb", def: "To jump on one foot or leap like a bunny." },
+      "POP": { pos: "verb/noun", def: "A quick burst sound, like a balloon or popcorn." },
+      "COP": { pos: "noun", def: "A friendly police officer." },
+      "HOT": { pos: "adjective", def: "Very warm in temperature, like boiling water or sunny weather." },
+      "POT": { pos: "noun", def: "A deep round container for cooking soup or growing a plant." },
+      "COT": { pos: "noun", def: "A small, light bed for a baby or camping." },
+      "DOT": { pos: "noun", def: "A tiny round spot or full stop." },
+      "GOT": { pos: "verb", def: "Received or obtained something." },
+      "LOT": { pos: "noun", def: "A large number or amount of things." },
+      "NOT": { pos: "adverb", def: "Word used to say no." },
+      "SIT": { pos: "verb", def: "To rest your body on a chair." },
+      "HIT": { pos: "verb", def: "To strike a ball with a bat or racket." },
+      "BIT": { pos: "noun", def: "A small piece of something." },
+      "FIT": { pos: "adj/verb", def: "Healthy and strong, or the right size." },
+      "KIT": { pos: "noun", def: "A box of tools or sports clothes." },
+      "LIT": { pos: "verb", def: "Made bright with light." },
+      "PIT": { pos: "noun", def: "A deep hole in the ground, or the hard stone inside a peach." },
+      "NET": { pos: "noun", def: "Mesh used in football goals, badminton, or catching fish." },
+      "PET": { pos: "noun", def: "A tame animal kept at home as a friend, like a cat or hamster." },
+      "WET": { pos: "adjective", def: "Covered or soaked with water." },
+      "JET": { pos: "noun", def: "A very fast airplane." },
+      "GET": { pos: "verb", def: "To receive or fetch something." },
+      "LET": { pos: "verb", def: "To allow someone to do something." },
+      "MET": { pos: "verb", def: "Saw and talked to someone." },
+      "SET": { pos: "verb/noun", def: "To put something in place, or a group of matching items." },
+      "VET": { pos: "noun", def: "An animal doctor who cares for pets." },
+      "BOY": { pos: "noun", def: "A young male child or pupil." },
+      "TOY": { pos: "noun", def: "An object for children to play with, like blocks or a doll." },
+      "JOY": { pos: "noun", def: "A feeling of great happiness!" },
+      "COW": { pos: "noun", def: "A large farm animal that eats grass and gives us milk." },
+      "NOW": { pos: "adverb", def: "At this very moment." },
+      "HOW": { pos: "adverb", def: "In what way something happens." },
+      "BOW": { pos: "noun/verb", def: "A ribbon knot, or to bend forward politely." },
+      "ROW": { pos: "noun/verb", def: "A straight line of desks, or to paddle a boat." },
+      "LOW": { pos: "adjective", def: "Close to the ground; not high." },
+      "MUG": { pos: "noun", def: "A large cup with a handle for hot cocoa or milk." },
+      "RUG": { pos: "noun", def: "A thick mat that covers part of the floor." },
+      "HUG": { pos: "verb/noun", def: "To wrap your arms around someone to show love." },
+      "JUG": { pos: "noun", def: "A container with a handle and spout for pouring water." },
+      "TUG": { pos: "verb", def: "To pull something hard." },
+      "MUD": { pos: "noun", def: "Soft, wet soil after the rain." },
+      "LIP": { pos: "noun", def: "The soft edge of your mouth." },
+      "ZIP": { pos: "noun/verb", def: "A fastener on a jacket or pencil case." },
+      "TIP": { pos: "noun", def: "The pointed end of a pencil, or a helpful hint!" },
+      "SIP": { pos: "verb", def: "To drink a tiny bit at a time." },
+      "DIP": { pos: "verb", def: "To put a biscuit or brush briefly into liquid." },
+      "HIP": { pos: "noun", def: "The side of your body below your waist." },
+      "RIP": { pos: "verb", def: "To tear paper or cloth." },
+      "PIN": { pos: "noun", def: "A thin pointed piece of metal used to fasten badges." },
+      "BIN": { pos: "noun", def: "A container for throwing away rubbish." },
+      "FIN": { pos: "noun", def: "The flat part on a fish's body that helps it swim." },
+      "TIN": { pos: "noun", def: "A metal container for biscuits or food." },
+      "WIN": { pos: "verb", def: "To come first in a game or race!" },
+      "BEE": { pos: "noun", def: "A yellow and black buzzing insect that makes sweet honey." },
+      "SEE": { pos: "verb", def: "To look at something with your eyes." },
+      "TEA": { pos: "noun", def: "A warm drink made by pouring hot water over leaves." },
+      "SEA": { pos: "noun", def: "The salty ocean water that covers most of the Earth." },
+      "PEA": { pos: "noun", def: "A tiny round green vegetable inside a pod." },
+      "KEY": { pos: "noun", def: "A metal tool used to unlock a door." },
+      "SKY": { pos: "noun", def: "The space above the Earth where clouds, birds, and the sun are." },
+      "FLY": { pos: "verb/noun", def: "To move through the air with wings." },
+      "CRY": { pos: "verb", def: "To shed tears when sad or hurt." },
+      "DRY": { pos: "adjective", def: "With no water or liquid; not wet." },
+      "TRY": { pos: "verb", def: "To make an effort to do something." },
+      "SHY": { pos: "adjective", def: "Quiet and nervous around new people." },
+      "ICE": { pos: "noun", def: "Water that is frozen solid." },
+      "ANT": { pos: "noun", def: "A tiny hard-working insect that lives in a colony." },
+      "ARM": { pos: "noun", def: "The upper limb of your body between your shoulder and hand." },
+      "ART": { pos: "noun", def: "Drawing, painting, and making creative things." },
+      "EAR": { pos: "noun", def: "The part of your head that you hear sounds with." },
+      "EAT": { pos: "verb", def: "To chew and swallow food." },
+      "EYE": { pos: "noun", def: "The part of your face that you see with." },
+      "INK": { pos: "noun", def: "Colored liquid inside a pen or printer." },
+      "OWL": { pos: "noun", def: "A wise night bird with big round eyes that hoots." },
+      "OLD": { pos: "adjective", def: "Having lived or existed for many years; not new." },
+      "ONE": { pos: "number", def: "The number 1." },
+      "OUT": { pos: "adverb", def: "Outside; not inside." },
+      "ZOO": { pos: "noun", def: "A park where many wild animals are kept for people to visit." },
+
+      // Easy 4-to-5 Letter Primary School Favorites
+      "PLAY": { pos: "verb", def: "To have fun with games or toys with your friends." },
+      "CLAY": { pos: "noun", def: "Soft earth used for shaping pots and art models." },
+      "STAY": { pos: "verb", def: "To remain in the same place and not leave." },
+      "PLAN": { pos: "noun", def: "An idea for how to do something ahead of time." },
+      "FLAT": { pos: "adjective", def: "Smooth and level with no bumps." },
+      "FLAG": { pos: "noun", def: "A piece of cloth with colors representing a country or school." },
+      "FLAP": { pos: "verb", def: "When a bird moves its wings up and down." },
+      "SLAP": { pos: "verb", def: "A quick flat-hand pat, like a high-five." },
+      "SLIP": { pos: "verb", def: "To slide accidentally on a wet floor." },
+      "SHIP": { pos: "noun", def: "A large boat that sails across the ocean." },
+      "SHOP": { pos: "noun", def: "A store where you buy things." },
+      "STOP": { pos: "verb", def: "To finish moving or doing something." },
+      "STEP": { pos: "noun", def: "Putting one foot in front of the other to walk." },
+      "STAR": { pos: "noun", def: "A bright point of light shining in the night sky." },
+      "STIR": { pos: "verb", def: "To mix a drink or soup around with a spoon." },
+      "SPOT": { pos: "noun", def: "A small round mark, or a particular place." },
+      "SPIN": { pos: "verb", def: "To turn around and around quickly like a top." },
+      "SPIT": { pos: "verb", def: "To eject liquid from the mouth." },
+      "SPAN": { pos: "noun", def: "The full distance from one side to the other, like a bridge." },
+      "SPAR": { pos: "verb", def: "To practice friendly movements in sports." },
+      "SPOON": { pos: "noun", def: "A round-bowled tool used for eating soup or cereal." },
+      "SPORT": { pos: "noun", def: "An active game like football, badminton, or running." },
+      "SPACE": { pos: "noun", def: "Where the stars, moon, and planets are, or an empty area." },
+      "SPELL": { pos: "verb", def: "To write or name the letters that make a word in the right order." },
+      "SPEAK": { pos: "verb", def: "To talk and use your voice in English." },
+      "SMILE": { pos: "verb/noun", def: "A happy expression on your face when the corners of your mouth turn up." },
+      "SMALL": { pos: "adjective", def: "Little in size; not big." },
+      "SMART": { pos: "adjective", def: "Clever, bright, and quick to learn!" },
+      "SNACK": { pos: "noun", def: "A small portion of food eaten between meals." },
+      "SNAKE": { pos: "noun", def: "A long reptile with scales and no legs that slithers." },
+      "SNOW": { pos: "noun", def: "Soft white frozen flakes that fall from the sky in winter." },
+      "SLOW": { pos: "adjective", def: "Moving at a low speed; not fast." },
+      "SHOW": { pos: "verb/noun", def: "To let someone see something, or a performance." },
+      "SHOE": { pos: "noun", def: "What you wear on your feet when walking outside." },
+      "BOOK": { pos: "noun", def: "Pages of stories bound together for reading." },
+      "COOK": { pos: "verb", def: "To prepare food by heating it." },
+      "LOOK": { pos: "verb", def: "To turn your eyes toward something to see it." },
+      "HOOK": { pos: "noun", def: "A curved piece of metal for hanging bags or catching fish." },
+      "TOOK": { pos: "verb", def: "Past tense of take." },
+      "BOOT": { pos: "noun", def: "A strong shoe that covers your foot and ankle." },
+      "FOOT": { pos: "noun", def: "The bottom part of your leg that you stand on." },
+      "FOOD": { pos: "noun", def: "What people and animals eat to grow strong." },
+      "GOOD": { pos: "adjective", def: "Well done, kind, or nice." },
+      "WOOD": { pos: "noun", def: "The hard material that trees are made of." },
+      "MOON": { pos: "noun", def: "The bright round object that shines in the sky at night." },
+      "SOON": { pos: "adverb", def: "In a short time from now." },
+      "GAME": { pos: "noun", def: "An activity with rules played for fun." },
+      "NAME": { pos: "noun", def: "The word a person, animal, or team is called." },
+      "SAME": { pos: "adjective", def: "Exactly alike; not different." },
+      "CAME": { pos: "verb", def: "Arrived at a place." },
+      "TAME": { pos: "adjective", def: "Gentle and not afraid of people, like a pet." },
+      "TIME": { pos: "noun", def: "Minutes and hours measured by a clock." },
+      "LIME": { pos: "noun", def: "A small green sour citrus fruit." },
+      "CAKE": { pos: "noun", def: "A sweet baked dessert for birthdays." },
+      "BAKE": { pos: "verb", def: "To cook bread or cake inside an oven." },
+      "LAKE": { pos: "noun", def: "A large area of fresh water surrounded by land." },
+      "MAKE": { pos: "verb", def: "To build or create something." },
+      "WAKE": { pos: "verb", def: "To stop sleeping in the morning." },
+      "TAKE": { pos: "verb", def: "To reach out and hold something." },
+      "BIKE": { pos: "noun", def: "A bicycle with two wheels and pedals." },
+      "LIKE": { pos: "verb", def: "To enjoy something." },
+      "HIKE": { pos: "verb", def: "A long walk in nature or up a hill." },
+      "FISH": { pos: "noun", def: "An animal with fins that lives and swims in water." },
+      "DISH": { pos: "noun", def: "A plate or bowl for food." },
+      "WISH": { pos: "verb", def: "To hope for something special." },
+      "WASH": { pos: "verb", def: "To clean with water and soap." },
+      "CASH": { pos: "noun", def: "Money in coins and notes." },
+      "FROG": { pos: "noun", def: "A small green animal with long back legs that leaps." },
+      "BIRD": { pos: "noun", def: "An animal with feathers, wings, and a beak." },
+      "BEAR": { pos: "noun", def: "A large, strong furry animal." },
+      "DEAR": { pos: "adjective", def: "Loved very much." },
+      "FEAR": { pos: "noun", def: "Feeling scared." },
+      "HEAR": { pos: "verb", def: "To listen to sounds with your ears." },
+      "NEAR": { pos: "preposition", def: "Close by; not far away." },
+      "PEAR": { pos: "noun", def: "A sweet green fruit." },
+      "YEAR": { pos: "noun", def: "12 months or 365 days." },
+      "LION": { pos: "noun", def: "A big wild cat with a golden mane." },
+      "DUCK": { pos: "noun", def: "A water bird that quacks and swims." },
+      "LUCK": { pos: "noun", def: "Good things that happen by chance." },
+      "JUMP": { pos: "verb", def: "To push yourself into the air with your legs." },
+      "SING": { pos: "verb", def: "To make music with your voice." },
+      "RING": { pos: "noun", def: "A round band worn on a finger, or a bell sound." },
+      "KING": { pos: "noun", def: "A male ruler who wears a crown." },
+      "WING": { pos: "noun", def: "The part of a bird or plane used for flying." },
+      "DESK": { pos: "noun", def: "A classroom table for reading and writing." },
+      "TREE": { pos: "noun", def: "A tall plant with a trunk, branches, and leaves." },
+      "FREE": { pos: "adjective", def: "Costing nothing, or able to move anywhere." },
+      "MILK": { pos: "noun", def: "A white drink that makes bones and teeth strong." },
+      "SILK": { pos: "noun", def: "Very soft, smooth cloth made by silkworms." },
+      "RICE": { pos: "noun", def: "White or brown grains we cook and eat every day." },
+      "MICE": { pos: "noun", def: "More than one mouse." },
+      "NICE": { pos: "adjective", def: "Kind, pleasant, and friendly." },
+      "DICE": { pos: "noun", def: "Small cubes with dots (1 to 6) used in board games." },
+      "HAND": { pos: "noun", def: "The part at the end of your arm with five fingers." },
+      "SAND": { pos: "noun", def: "Tiny grains found on the beach." },
+      "BAND": { pos: "noun", def: "A group of people playing music together." },
+      "LAND": { pos: "noun", def: "Solid ground of the Earth." },
+      "BALL": { pos: "noun", def: "A round object you kick, throw, or bounce." },
+      "TALL": { pos: "adjective", def: "High from bottom to top, like a giraffe." },
+      "CALL": { pos: "verb", def: "To shout out or phone someone." },
+      "WALL": { pos: "noun", def: "The side of a room or building." },
+      "HALL": { pos: "noun", def: "A big room in a school for assemblies." },
+      "FALL": { pos: "verb", def: "To drop down toward the ground." },
+      "GOLD": { pos: "noun", def: "Shiny yellow metal for first-place medals." },
+      "COLD": { pos: "adjective", def: "Chilly like ice; not hot." },
+      "HOLD": { pos: "verb", def: "To keep something in your hands." },
+      "TOLD": { pos: "verb", def: "Shared a story or information." },
+      "BOLD": { pos: "adjective", def: "Brave and confident." },
+      "FOLD": { pos: "verb", def: "To bend paper neatly." }
+    };
+
+    // Broad built-in dictionary list for fast local checking
+    const BUILTIN_WORD_STRING = `
+      AA AB AD AE AG AH AI AL AM AN AR AS AT AW AX AY BA BE BI BO BY DO ED EF EH EL EM EN ER ES ET EX FA FE GO HA HE HI HM HO ID IF IN IS IT JO KA KI LA LI LO MA ME MI MM MO MU MY NA NE NO NU OD OE OF OH OI OK OM ON OP OR OS OW OX OY PA PE PI PO QI RE SH SI SO TA TI TO UH UM UN UP US UT WE WO XI XU YA YE YO ZA
+      ACE ACT ADD AGE AGO AID AIM AIR ALE ALL AND ANT ANY APE APT ARC ARE ARK ARM ART ASH ASK ATE AWE AXE
+      BAD BAG BAN BAR BAT BAY BED BEE BEG BET BIB BID BIG BIN BIT BOA BOB BOG BOO BOW BOX BOY BUD BUG BUN BUS BUT BUY BYE
+      CAB CAD CAM CAN CAP CAR CAT COB COD COG COP COT COW COY CRY CUB CUD CUP CUR CUT
+      DAB DAD DAM DAN DAY DEN DEW DID DIE DIG DIM DIN DIP DOC DOE DOG DON DOT DRY DUB DUD DUE DUG DUN DUO DYE
+      EAR EAT EEL EGG EGO ELF ELM EMU END ERA EVE EYE
+      FAB FAD FAN FAR FAT FAX FED FEE FEN FEW FIB FIG FIN FIR FIT FIX FLY FOB FOE FOG FOR FOX FRY FUN FUR
+      GAB GAD GAG GAL GAP GAS GAY GEL GEM GET GIG GIN GYM GOT GUM GUN GUT GUY
+      HAD HAG HAM HAS HAT HAY HEM HEN HER HEW HEX HID HIM HIP HIS HIT HOB HOD HOG HOP HOT HOW HUB HUE HUG HUM HUT
+      ICE ICY ILL IMP INK INN ION IRE IRK IVY
+      JAB JAG JAM JAR JAW JAY JET JIG JOB JOG JOT JOY JUG JUT
+      KEG KEN KEY KID KIN KIT KOI
+      LAB LAD LAG LAP LAW LAX LAY LEA LED LEG LET LID LIE LIP LIT LOB LOG LOP LOT LOW LUG
+      MAD MAN MAP MAR MAT MAW MAX MAY MEN MET MEW MID MIX MOB MOD MOM MOP MOW MUD MUG MUM
+      NAB NAG NAP NAY NET NEW NIB NIL NIP NIT NOD NOR NOT NOW NUN NUT
+      OAK OAR OAT ODD ODE OFF OFT OIL OLD ONE OPT ORB ORE OUR OUT OVA OWE OWL OWN
+      PAD PAL PAN PAP PAR PAT PAW PAY PEA PEG PEN PEP PER PET PEW PIE PIG PIN PIT PLY POD POI POP POT POW PRO PRY PUB PUG PUN PUP PUS PUT
+      FIN QUA
+      RAD RAG RAM RAN RAP RAT RAW RAY RED REP RIB RID RIG RIM RIP ROB ROD ROE ROT ROW RUB RUG RUM RUN RUT RYE
+      SAC SAD SAG SAP SAT SAW SAY SEA SEE SET SEW SHE SHY SIN SIP SIR SIT SIX SKI SKY SLY SOB SOD SON SOP SOT SOW SOY SPA SPY STY SUB SUM SUN SUP
+      TAB TAD TAG TAN TAP TAR TAT TAX TEA TED TEE TEN THE THY TIC TIE TIN TIP TOE TON TOO TOP TOT TOW TOY TRY TUB TUG TWO
+      URN USE VAN VAT VET VEX VIA VIE VOW
+      WAD WAG WAN WAR WAS WAX WAY WEB WED WEE WET WHO WHY WIG WIN WIT WOE WOK WON WOO WOW WRY
+      YAK YAM YAP YAW YEA YES YET YEW YIN YOU YOW ZAP ZED ZEE ZIG ZIP ZIT ZOO
+      ABLE ACHE ACID ACRE AGED AIDE AIRY ALLY ALSO AMID ANEW ANTI ARCH AREA ARMY ARTS ASHY ATOM AUNT AUTO AVID AWAY
+      BABY BACK BAIT BAKE BALD BALE BALL BALM BAND BANE BANG BANK BARE BARK BARN BASE BASH MASK BATH BEAD BEAK BEAM BEAN BEAR BEAT BEDS BEEF BEEN BEEP BEER BEET BELL BELT BEND BENT BERG BEST BETA BIAS BIDE BIKE BILL BIND BIRD BITE BLOW BLUE BLUR BOAR BOAT BODY BOIL BOLD BOLT BOMB BOND BONE BOOK BOOM BOON BOOT BORE BORN BOSS BOTH BOUT BOWL BOYS BRAG BRAN BRAT BRED BREW BRIM BROW BUCK BUDS BUFF BULB BULK BULL BUMP BUNK BURN BURP BURY BUSH BUSY BUZZ
+      CAFE CAGE CAKE CALF CALL CALM CAME CAMP CANE CAPE CARD CARE CARP CART CASE CASH CAST CATS CAVE CELL CENT CHAT CHEF CHEW CHIN CHIP CHOP CHOW CITE CITY CLAD CLAM CLAN CLAP CLAW CLAY CLIP CLOG CLUB CLUE COAL COAT COAX CODE COIL COIN COLD COLT COMB COME CONE COOK COOL COOP COPE COPY CORD CORE CORK CORN COST COZY CRAB CRAM CREW CRIB CROP CROW CUBE CUBS CUFF CULL CUPS CURB CURE CURL CUTE
+      DAME DAMP DARE DARK DARN DART DASH DATA DATE DAWN DAYS DAZE DEAD DEAF DEAL DEAN DEAR DEBT DECK DEED DEEM DEEP DEER DEMO DENS DENT DENY DESK DIAL DICE DIED DIET DIME DINE DING DIRE DIRT DISC DISH DISK DIVE DOCK DOER DOES DOGS DOLL DOME DONE DOOM DOOR DOSE DOTE DOVE DOWN DOZE DRAB DRAG DRAW DREW DRIP DROP DRUG DRUM DUAL DUCK DUCT DUEL DUET DULL DULY DUMB DUMP DUNE DUSK DUST DUTY DYED
+      EACH EARL EARN EARS EASE EAST EASY EATS ECHO EDGE EDIT EELS EGGS ELSE EMIT ENDS ENVY EPIC EVEN EVER EVIL EXAM EXIT EYES
+      FACE FACT FADE FAIL FAIR FAKE FALL FAME FANG FARE FARM FAST FATE FAWN FEAR FEAT FEED FEEL FEES FEET FELL FELT FEND FERN FEST FILE FILL FILM FIND FINE FINS FIRE FIRM FISH FIST FIVE FIZZ FLAG FLAP FLAT FLAW FLEA FLED FLEE FLEW FLEX FLIP FLIT FLOG FLOP FLOW FOAL FOAM FOIL FOLD FOLK FOND FONT FOOD FOOL FOOT FORD FORE FORK FORM FORT FOUL FOUR FOWL FRAY FREE FRET FROG FROM FUEL FULL FUME FUND FURY FUSE FUSS
+      GAIN GALA GALE GALL GAME GANG GAPE GARB GASP GATE GAVE GAZE GEAR GEMS GENE GENT GERM GETS GIFT GILD GILL GIRL GIVE GLAD GLEE GLEN GLOB GLOW GLUE GOAL GOAT GOLD GOLF GONE GONG GOOD GOOF GOWN GRAB GRAD GRAM GRAY GREW GREY GRID GRIM GRIN GRIP GRIT GROW GRUB GULF GULL GULP GUMS GUST GUYS GYMS
+      HACK HAIL HAIR HALE HALF HALL HALT HAND HANG HARE HARM HARP HASH HATE HAUL HAVE HAWK HAZE HEAD HEAL HEAP HEAR HEAT HEEL HELD HELP HERB HERD HERE HERO HERS HIDE HIGH HIKE HILL HILT HIND HINT HIRE HISS HIVE HOLD HOLE HOLY HOME HONE HONK HOOD HOOF HOOK HOOP HOOT HOPE HORN HOSE HOST HOUR HOWL HUGE HULL HUMS HUMP HUNG HUNK HUNT HURL HURT HUSH HUSK HYMN
+      ICED IDEA IDLE IDOL INCH INFO INNS INTO IRIS IRON ISLE ITCH ITEM
+      JACK JADE JAIL JAMS JARS JAWS JAYS JAZZ JEAN JEER JELL JERK JEST JETS JILT JIVE JOBS JOCK JOGS JOIN JOKE JOLT JOTS JOYS JUDO JUGS JUMP JUNE JUNK JURY JUST
+      KALE KEEL KEEN KEEP KELP KEPT KEYS KICK KIDS KILL KILN KILO KILT KIND KING KINK KISS KITE KITS KNEE KNEW KNIT KNOB KNOT KNOW
+      LABS LACE LACK LADS LADY LAID LAIR LAKE LAMB LAME LAMP LAND LANE LAPS LARD LARK LASH LAST LATE LAVA LAWN LAWS LAYS LEAD LEAF LEAK LEAN LEAP LEFT LEGS LEND LENS LENT LESS LEST LIAR LICE LICK LIDS LIFE LIFT LIKE LILY LIMB LIME LIMP LINE LINK LINT LION LIPS LISP LIST LIVE LOAD LOAF LOAN LOBE LOCK LOFT LOGS LOIN LONE LONG LOOK LOOM LOON LOOP LOOT LORD LORE LOSE LOSS LOST LOTS LOUD LOVE LOWS LUCK LULL LUMP LUNG LURE LURK LUSH
+      MACE MADE MAID MAIL MAIN MAKE MALE MALL MALT MAMA MANE MANY MAPS MARE MARK MARS MART MASH MASK MASS MAST MATE MATH MATS MAUL MAZE MEAL MEAN MEAT MEEK MEET MELT MEMO MEND MENU MERE MESH MESS MICE MILD MILE MILK MILL MIME MIND MINE MINI MINK MINT MIRE MISS MIST MITE MITT MOAN MOAT MOCK MODE MOLD MOLE MOLT MONK MOOD MOON MOOR MOOT MOPE MORE MORN MOSS MOST MOTH MOVE MUCH MUCK MUFF MULE MULL MUSE MUSH MUSK MUST MUTE MYTH
+      NAIL NAME NAPE NAVY NEAR NEAT NECK NEED NEON NEST NETS NEWS NEXT NIBS NICE NICK NIGH NINE NODE NODS NONE NOOK NOON NORM NOSE NOTE NOUN NUDE NUMB NUNS NUTS
+      OAKS OARS OATH OATS OBEY ODDS ODOR OILS OILY OKAY OMEN OMIT ONCE ONLY ONTO OPEN OPAL ORAL ORBS ORCA ORES OURS OUST OUTS OVAL OVEN OVER OWED OWES OWLS OWNS OXEN
+      PACE PACK PACT PADS PAGE PAID PAIL PAIN PAIR PALE PALM PALS PANE PANG PANT PAPA PARE PARK PART PASS PAST PATH PATS PAWN PAWS PAYS PEAK PEAL PEAR PEAS PEAT PECK PEEK PEEL PEER PEGS PELT PENS PENT PERK PERM PEST PETS PEWS PICK PIER PIES PIGS PIKE PILE PILL PINE PING PINK PINT PIPE PITA PITH PITS PITY PLAN PLAY PLEA PLOD PLOT PLOW PLOY PLUG PLUM PLUS PODS POEM POET POKE POLE POLL POLO POND PONY POOL POOR POPE POPS PORE PORK PORT POSE POST POUR POUT PRAY PREP PREY PRIM PROD PROP PROW PUCK PUFF PUGS PULL PULP PUMP PUNK PUNS PUPS PURE PURR PUSH PUTS PUTT
+      QUAD QUAY QUIT QUIZ
+      RACE RACK RAFT RAGE RAID RAIL RAIN RAKE RAMP RANG RANK RANT RARE RASH RASP RATE RATS RAVE RAYS READ REAL REAM REAP REAR REDO REED REEF REEK REEL REIN RELY REND RENT REST RICE RICH RIDE RIDS RIFE RIFT RIGS RILL RIME RIMS RIND RING RINK RIOT RIPE RISE RISK RITE ROAD ROAM ROAR ROAST ROBE ROBS ROCK RODE RODS ROLE ROLL ROME ROOF ROOK ROOM ROOT ROPE ROSE ROSY ROTS ROUT ROVE ROWS RUDE RUGS RUIN RULE RUMP RUNG RUNS RUNT RUSE RUSH RUST RUTS
+      SACK SAFE SAGA SAGE SAID SAIL SAKE SALE SALT SAME SAND SANE SANG SANK SAPS SASH SAVE SAWS SAYS SCAB SCAR SEAL SEAM SEAR SEAT SECT SEED SEEK SEEM SEEN SEEP SELF SELL SEMI SEND SENT SETS SEWN SEWS SHAD SHAG SHAM SHED SHIN SHIP SHOD SHOE SHOO SHOP SHOT SHOW SHUN SHUT SICK SIDE SIFT SIGH SIGN SILK SILL SILO SILT SINE SING SINK SINS SIPS SIRE SIRS SITE SITS SIZE SKEW SKID SKIM SKIN SKIP SKIS SKIT SLAB SLAG SLAM SLAP SLAT SLAW SLAY SLED SLEW SLID SLIM SLIP SLIT SLOB SLOG SLOP SLOT SLOW SLUG SLUM SLUR SMOG SMUG SNAG SNAP SNIP SNOB SNOT SNOW SNUB SNUG SOAK SOAP SOAR SOBS SOCK SODA SODS SOFA SOFT SOIL SOLD SOLE SOLO SOME SONG SONS SOON SOOT SORE SORT SOUL SOUP SOUR SOWN SOWS SPAN SPAR SPAS SPAT SPEC SPED SPIN SPIT SPOT SPRY SPUD SPUN SPUR STAB STAG STAR STAT STAY STEM STEP STEW STIR STOP STOW STUB STUD STUN SUBS SUCH SUCK SUDS SUIT SULK SUMO SUMP SUMS SUNG SUNK SUNS SURE SURF SWAB SWAM SWAN SWAP SWAT SWAY SWIG SWIM SWUM SYNC
+      TABS TACK TACO TACT TAGS TAIL TAKE TALE TALK TALL TAME TANG TANK TAPE TAPS TARE TARP TART TASK TAXI TEAK TEAL TEAM TEAR TEAS TECH TEEM TEEN TEES TELL TEMP TEND TENS TENT TERM TERN TEST TEXT THAN THAT THAW THEE THEM THEN THEY THIN THIS THUD THUS TICK TIDE TIDY TIED TIER TIES TILE TILL TILT TIME TINE TING TINS TINT TINY TIPS TIRE TOAD TOES TOFU TOIL TOLD TOLL TOMB TOME TONE TONG TONS TOOK TOOL TOOT TOPS TORE TORN TORT TOSS TOTE TOUR TOWN TOYS TRAM TRAP TRAY TREE TREK TRIM TRIO TRIP TROD TROT TRUE TUBE TUBS TUCK TUFT TUGS TUNA TUNE TURF TURN TUSK TUTU TWIG TWIN TYPE
+      UGLY UNDO UNIT UNTO UPON URGE URNS USED USER USES
+      VAIN VALE VANE VANS VARY VASE VAST VEAL VEER VEIL VEIN VEND VENT VERB VERY VEST VETO VETS VIAL VICE VIED VIES VIEW VINE VISA VISE VOID VOLT VOTE VOWS
+      WADE WADS WAFT WAGE WAGS WAIL WAIT WAKE WALK WALL WAND WANE WANT WARD WARE WARM WARN WARP WARS WART WARY WASH WASP WATT WAVE WAVY WAXY WAYS WEAK WEAL WEAN WEAR WEBS WEED WEEK WEEP WEFT WELD WELL WELT WEND WENT WERE WEST WETS WHAM WHAT WHEN WHET WHEY WHIM WHIP WHIR WHIT WHIZ WHOA WHOM WICK WIDE WIFE WIGS WILD WILE WILL WILT WILY WIMP WIND WINE WING WINK WINS WIPE WIRE WIRY WISE WISH WISP WITH WITS WOES WOKE WOLF WOMB WOOD WOOF WOOL WORD WORE WORK WORM WORN WRAP WREN WRIT
+      YAKS YAMS YANG YANK YAPS YARD YARN YAWN YAWS YEAR YEAS YELL YELP YOGA YOKE YOLK YORE YOUR YULE
+      ZANY ZEAL ZERO ZEST ZINC ZONE ZOOM ZOOS
+      APPLE BERRY BREAD BRUSH CHAIR CHALK CLASS CLEAN CLEAR CLOCK CLOUD CLOWN COACH COUNT COURT CRANE CREAM CROWN DANCE DREAM DRESS DRINK DRIVE EARTH EARLY EIGHT EMPTY ENJOY EQUAL EVERY FIELD FIGHT FIRST FLAME FLOOR FLOUR FRUIT FUNNY GIANT GLASS GLOVE GRACE GRADE GRAIN GRAND GRAPE GRASS GREAT GREEN GROUP GUARD GUESS GUIDE HAPPY HEART HEAVY HORSE HOUSE HUMAN IMAGE JUICE KNIFE LAUGH LEARN LEAVE LIGHT LIMIT LOCAL LUNCH MAGIC MARCH MATCH MAYOR MEDAL METAL MIGHT MONEY MONTH MOUSE MUSIC NIGHT NOISE NORTH NOVEL NURSE OCEAN OFFER ORDER OTHER OWNER PAINT PAPER PARTY PEACE PEARL PHASE PHONE PHOTO PIANO PIECE PILOT PITCH PLACE PLANT PLATE POINT POUND POWER PRESS PRICE PRIDE PRIZE PROOF PROUD QUEEN QUICK QUIET QUITE RADIO RAISE RANGE REACH REACT READY REFER RELAX REPLY RIGHT RIVER ROBIN ROBOT ROUND ROUTE ROYAL RULER SALAD SCALE SCENE SCOPE SCORE SENSE SERVE SEVEN SHADE SHAKE SHALL SHAME SHAPE SHARE SHARP SHEEP SHEET SHELF SHELL SHIFT SHINE SHIRT SHOCK SHOOT SHORT SHOUT SIGHT SINCE SIXTH SIXTY SKILL SLEEP SLIDE SMALL SMART SMILE SMOKE SNAKE SOLID SOLVE SORRY SOUND SOUTH SPACE SPARE SPEAK SPEED SPEND SPICE SPOON SPORT STAFF STAGE STAIN STAND START STATE STEAM STEEL STICK STILL STOCK STONE STOOD STORE STORM STORY STRIP STUDY STUFF STYLE SUGAR SUITE SUPER SWEET TABLE TASTE TEACH TEETH THANK THEIR THEME THERE THESE THICK THING THINK THIRD THOSE THREE THROW TIGER TIGHT TITLE TODAY TOKEN TOTAL TOUCH TOWER TRACK TRADE TRAIN TREAT TREND TRIAL TRIBE TRICK TRUCK TRULY TRUST TRUTH TWICE UNDER UNION UNITY UNTIL UPPER URBAN USUAL VALUE VIDEO VISIT VOICE WASTE WATCH WATER WHEEL WHERE WHICH WHILE WHITE WHOLE WOMAN WOMEN WORLD WORRY WORSE WORST WORTH WOULD WRITE WRONG YOUNG YOUTH ZEBRA
+    `;
+
+    const VALID_WORDS_SET = new Set();
+    BUILTIN_WORD_STRING.trim().split(/\s+/).forEach(w => {
+      const clean = w.replace(/[^A-Z]/g, '');
+      if (clean.length >= 2) VALID_WORDS_SET.add(clean);
+    });
+    Object.keys(PRIMARY_DEFINITIONS).forEach(w => VALID_WORDS_SET.add(w));
+
+    // Sorted array of easy primary school words for priority hints & prefix searches
+    const EASY_PRIMARY_WORDS = Object.keys(PRIMARY_DEFINITIONS).sort((a, b) => a.length - b.length || a.localeCompare(b));
+
+    /*************************************************************************
+     * 3. HOMEPAGE INTERACTIVE 3D STACKING HERO DEMO
+     *************************************************************************/
+    const HERO_DEMO_STEPS = [
+      {
+        tiles: [
+          { letter: 'B', height: 1, stacked: false },
+          { letter: 'U', height: 1, stacked: false },
+          { letter: 'S', height: 1, stacked: false }
+        ],
+        caption: 'Start with <span class="text-white underline">BUS</span> 🚌 (Flat word = 2 pts per letter = <strong>6 pts</strong>)'
+      },
+      {
+        tiles: [
+          { letter: 'B', height: 1, stacked: false },
+          { letter: 'U', height: 1, stacked: false },
+          { letter: 'G', height: 2, stacked: true, under: 'S' }
+        ],
+        caption: 'Stack <span class="text-cyan-300 font-extrabold">G</span> on top of S ➔ <span class="text-emerald-300 underline">BUG</span> 🐛! (1 pt for EVERY tile including buried S = <strong>4 pts</strong>!)'
+      },
+      {
+        tiles: [
+          { letter: 'M', height: 2, stacked: true, under: 'B' },
+          { letter: 'U', height: 1, stacked: false },
+          { letter: 'G', height: 2, stacked: true, under: 'S' }
+        ],
+        caption: 'Stack <span class="text-cyan-300 font-extrabold">M</span> on top of B ➔ <span class="text-emerald-300 underline">MUG</span> ☕! (2 + 1 + 2 = <strong>5 pts</strong>!)'
+      },
+      {
+        tiles: [
+          { letter: 'R', height: 3, stacked: true, under: 'B,M' },
+          { letter: 'U', height: 1, stacked: false },
+          { letter: 'G', height: 2, stacked: true, under: 'S' }
+        ],
+        caption: 'Stack <span class="text-cyan-300 font-extrabold">R</span> on top of M ➔ <span class="text-emerald-300 underline">RUG</span> 🧶! (3 + 1 + 2 = <strong>6 pts</strong>!)'
+      }
+    ];
+    let heroDemoIdx = 0;
+
+    function renderHeroDemo() {
+      const container = document.getElementById('heroDemoTiles');
+      const caption = document.getElementById('heroDemoCaption');
+      if (!container || !caption) return;
+      const step = HERO_DEMO_STEPS[heroDemoIdx];
+
+      container.innerHTML = step.tiles.map(t => `
+        <div onclick="cycleHeroDemo()" class="cursor-pointer w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex flex-col items-center justify-center relative select-none transition-all duration-300 ${t.stacked ? 'tile-pending' : 'tile-locked'} tile-stack-${t.height}">
+          <span class="absolute top-0.5 right-1 text-[10px] font-extrabold px-1.5 rounded-full ${t.height > 1 ? 'bg-indigo-950 text-amber-300' : 'bg-amber-900/20 text-amber-950'}">x${t.height}</span>
+          <span class="font-display font-bold text-2xl sm:text-3xl leading-none mt-1">${t.letter}</span>
+          ${t.under ? `<span class="text-[8px] font-extrabold opacity-75">under:${t.under}</span>` : ''}
+        </div>
+      `).join('');
+
+      caption.innerHTML = step.caption;
+    }
+
+    function cycleHeroDemo() {
+      heroDemoIdx = (heroDemoIdx + 1) % HERO_DEMO_STEPS.length;
+      playStackSound(heroDemoIdx + 1);
+      renderHeroDemo();
+    }
+
+    /*************************************************************************
+     * 4. SETUP SCREEN LOGIC (TEAMS, TIMER, STARTER WORD)
+     *************************************************************************/
+    const DEFAULT_TEAM_CONFIGS = [
+      { name: "Word Wizards", color: "from-amber-400 to-orange-500", icon: "fa-wand-magic-sparkles" },
+      { name: "Spelling Stars", color: "from-cyan-400 to-sky-600", icon: "fa-star" },
+      { name: "Tile Titans", color: "from-emerald-400 to-teal-600", icon: "fa-shield-halved" },
+      { name: "Vocab Vikings", color: "from-purple-400 to-indigo-600", icon: "fa-bolt" },
+      { name: "Alpha Aces", color: "from-rose-400 to-pink-600", icon: "fa-rocket" },
+      { name: "Grammar Guardians", color: "from-lime-400 to-green-600", icon: "fa-crown" }
+    ];
+
+    let setupMinutes = 10;
+    let setupTeamCount = 4;
+    let customTeamNames = DEFAULT_TEAM_CONFIGS.map(t => t.name);
+
+    function goToSetupScreen() {
+      initAudio();
+      playPop(520);
+      showScreen('setupScreen');
+      renderSetupScreen();
+    }
+
+    function renderSetupScreen() {
+      document.getElementById('setupMinutesVal').textContent = setupMinutes;
+      document.querySelectorAll('.timer-preset-btn').forEach(btn => {
+        const m = parseInt(btn.getAttribute('data-min'), 10);
+        if (m === setupMinutes) {
+          btn.className = "timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-indigo-600 text-white border-2 border-indigo-700 shadow-[0_3px_0_#312e81]";
+        } else {
+          btn.className = "timer-preset-btn btn-3d py-1.5 rounded-xl font-display font-bold text-sm bg-white text-indigo-900 border-2 border-indigo-200 shadow-[0_3px_0_#c7d2fe]";
+        }
+      });
+
+      document.querySelectorAll('.team-count-btn').forEach(btn => {
+        const c = parseInt(btn.getAttribute('data-count'), 10);
+        if (c === setupTeamCount) {
+          btn.className = "team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm bg-emerald-600 text-white shadow-sm";
+        } else {
+          btn.className = "team-count-btn w-8 h-8 rounded-lg font-display font-bold text-sm bg-slate-100 text-slate-700 hover:bg-slate-200";
+        }
+      });
+
+      const list = document.getElementById('teamSetupList');
+      list.innerHTML = '';
+      for (let i = 0; i < setupTeamCount; i++) {
+        const cfg = DEFAULT_TEAM_CONFIGS[i];
+        list.innerHTML += `
+          <div class="bg-white rounded-xl p-2.5 border-2 border-slate-200 flex items-center gap-2.5 shadow-sm">
+            <div class="w-9 h-9 rounded-lg bg-gradient-to-br ${cfg.color} text-white flex items-center justify-center text-sm shadow-sm shrink-0">
+              <i class="fa-solid ${cfg.icon}"></i>
+            </div>
+            <div class="flex-grow min-w-0">
+              <label class="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Team ${i + 1}</label>
+              <input type="text" value="${customTeamNames[i]}" oninput="customTeamNames[${i}] = this.value"
+                class="w-full font-display font-bold text-sm text-slate-900 border-b border-transparent focus:border-indigo-500 focus:outline-none bg-transparent truncate" />
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function setTimerPreset(mins) {
+      setupMinutes = mins;
+      playPop(480);
+      renderSetupScreen();
+    }
+
+    function adjustCustomMinutes(delta) {
+      setupMinutes = Math.min(Math.max(1, setupMinutes + delta), 45);
+      playPop(460);
+      renderSetupScreen();
+    }
+
+    function setTeamCount(count) {
+      setupTeamCount = count;
+      playPop(540);
+      renderSetupScreen();
+    }
+
+    function showScreen(screenId) {
+      ['homeScreen', 'setupScreen', 'gameScreen', 'winnerScreen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (id === screenId) {
+          el.classList.remove('hidden');
+          if (id !== 'gameScreen') el.classList.add('flex');
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        }
+      });
+
+      const inGame = screenId === 'gameScreen';
+      document.getElementById('headerGameControls').classList.toggle('hidden', !inGame);
+      document.getElementById('headerGameControls').classList.toggle('flex', inGame);
+      document.getElementById('endGameHeaderBtn').classList.toggle('hidden', !inGame);
+      document.getElementById('endGameHeaderBtn').classList.toggle('flex', inGame);
+    }
+
+    function confirmReturnHome() {
+      if (!document.getElementById('gameScreen').classList.contains('hidden')) {
+        pauseTimer();
+      }
+      showScreen('homeScreen');
+    }
+
+    /*************************************************************************
+     * 5. CORE UPWORDS 8x8 GAME ENGINE & STATE
+     *************************************************************************/
+    const GRID_SIZE = 8;
+    let board = [];
+    let teams = [];
+    let currentTeamIdx = 0;
+    let currentRound = 1;
+    let selectedRackIdx = null;
+    let playedWordsHistory = [];
+    let activeHintCells = [];
+
+    let remainingSeconds = 600;
+    let timerInterval = null;
+    let isTimerPaused = false;
+
+    function initEmptyBoard() {
+      board = [];
+      for (let r = 0; r < GRID_SIZE; r++) {
+        const row = [];
+        for (let c = 0; c < GRID_SIZE; c++) {
+          row.push({ stack: [], pending: null });
+        }
+        board.push(row);
+      }
+    }
+
+    function startGame() {
+      initAudio();
+      playFanfare();
+      initEmptyBoard();
+      playedWordsHistory = [];
+      activeHintCells = [];
+      currentTeamIdx = 0;
+      currentRound = 1;
+      selectedRackIdx = null;
+
+      teams = [];
+      for (let i = 0; i < setupTeamCount; i++) {
+        const cfg = DEFAULT_TEAM_CONFIGS[i];
+        teams.push({
+          id: i,
+          name: (customTeamNames[i] && customTeamNames[i].trim()) ? customTeamNames[i].trim() : cfg.name,
+          color: cfg.color,
+          icon: cfg.icon,
+          score: 0,
+          wordsCount: 0,
+          rack: []
+        });
+      }
+
+      // Place Starter Word in Center Row 4 (r=3)
+      const starterChoice = document.getElementById('starterWordSelect').value;
+      if (starterChoice && starterChoice !== 'EMPTY') {
+        const word = starterChoice.toUpperCase();
+        const startRow = 3;
+        const startCol = Math.floor((GRID_SIZE - word.length) / 2);
+        for (let i = 0; i < word.length; i++) {
+          board[startRow][startCol + i].stack.push(word[i]);
+        }
+        playedWordsHistory.push({
+          word: word,
+          teamName: "Starter Word",
+          points: 0,
+          isStacked: false
+        });
+      }
+
+      teams.forEach(t => {
+        t.rack = generateSmartRackForBoard();
+      });
+
+      remainingSeconds = setupMinutes * 60;
+      isTimerPaused = false;
+      updateTimerUI();
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(tickGameTimer, 1000);
+
+      showScreen('gameScreen');
+      renderAllGameUI();
+      setFeedback('info', `${teams[currentTeamIdx].name}'s Turn! Tap a letter below & tap the board, or click "Help Here!" to stack!`);
+    }
+
+    function generateSmartRackForBoard() {
+      const vowels = ['A', 'E', 'I', 'O', 'U'];
+      const friendlyConsonants = ['B', 'C', 'D', 'F', 'G', 'H', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'W', 'Y'];
+      const rack = [];
+
+      // Guarantee 3 letters that can stack directly onto current board words to make easy primary words!
+      const helpfulLetters = findHelpfulStackingLetters();
+      if (helpfulLetters.length > 0) {
+        helpfulLetters.sort(() => Math.random() - 0.5);
+        for (let i = 0; i < Math.min(3, helpfulLetters.length); i++) {
+          rack.push({ letter: helpfulLetters[i], used: false });
+        }
+      }
+
+      // Ensure at least 2 vowels
+      while (rack.filter(t => 'AEIOU'.includes(t.letter)).length < 2 && rack.length < 7) {
+        const v = vowels[Math.floor(Math.random() * vowels.length)];
+        rack.push({ letter: v, used: false });
+      }
+
+      // Fill up to 7 tiles
+      while (rack.length < 7) {
+        const pool = Math.random() < 0.35 ? vowels : friendlyConsonants;
+        const ch = pool[Math.floor(Math.random() * pool.length)];
+        rack.push({ letter: ch, used: false });
+      }
+
+      return rack.sort(() => Math.random() - 0.5);
+    }
+
+    function findHelpfulStackingLetters() {
+      const letters = new Set();
+      const boardWords = findAllExistingBoardWords();
+      const alphabet = "ABCDEFGHIJKLMNOPRSTUVWYZ";
+
+      boardWords.forEach(bw => {
+        const wordStr = bw.letters.join('');
+        for (let i = 0; i < wordStr.length; i++) {
+          const cell = board[bw.cells[i].r][bw.cells[i].c];
+          if (cell.stack.length >= 5) continue;
+          for (const ch of alphabet) {
+            if (ch === wordStr[i]) continue;
+            const candidate = wordStr.slice(0, i) + ch + wordStr.slice(i + 1);
+            if (PRIMARY_DEFINITIONS[candidate]) {
+              letters.add(ch);
+            }
+          }
+        }
+      });
+      return Array.from(letters);
+    }
+
+    function findAllExistingBoardWords() {
+      const found = [];
+      // Horizontal words
+      for (let r = 0; r < GRID_SIZE; r++) {
+        let c = 0;
+        while (c < GRID_SIZE) {
+          if (getCellTopLetter(r, c, true)) {
+            const cells = [];
+            const letters = [];
+            while (c < GRID_SIZE && getCellTopLetter(r, c, true)) {
+              cells.push({ r, c });
+              letters.push(getCellTopLetter(r, c, true));
+              c++;
+            }
+            if (letters.length >= 2) found.push({ dir: 'H', cells, letters, word: letters.join('') });
+          } else {
+            c++;
+          }
+        }
+      }
+      // Vertical words
+      for (let c = 0; c < GRID_SIZE; c++) {
+        let r = 0;
+        while (r < GRID_SIZE) {
+          if (getCellTopLetter(r, c, true)) {
+            const cells = [];
+            const letters = [];
+            while (r < GRID_SIZE && getCellTopLetter(r, c, true)) {
+              cells.push({ r, c });
+              letters.push(getCellTopLetter(r, c, true));
+              r++;
+            }
+            if (letters.length >= 2) found.push({ dir: 'V', cells, letters, word: letters.join('') });
+          } else {
+            r++;
+          }
+        }
+      }
+      return found;
+    }
+
+    function getCellTopLetter(r, c, lockedOnly = false) {
+      const cell = board[r][c];
+      if (!lockedOnly && cell.pending) return cell.pending.letter;
+      if (cell.stack.length > 0) return cell.stack[cell.stack.length - 1];
+      return null;
+    }
+
+    function getCellHeight(r, c, lockedOnly = false) {
+      const cell = board[r][c];
+      return cell.stack.length + (!lockedOnly && cell.pending ? 1 : 0);
+    }
+
+    /*************************************************************************
+     * 6. RENDERING THE ZERO-SCROLL GAME DASHBOARD
+     *************************************************************************/
+    function renderAllGameUI() {
+      renderTurnHeader();
+      renderScoreboard();
+      renderBoardGrid();
+      renderTeamRack();
+      renderLiveBoardWordsPills();
+      renderWordHistory();
+      updateLiveTurnPreview();
+    }
+
+    function renderTurnHeader() {
+      const team = teams[currentTeamIdx];
+      if (!team) return;
+      const banner = document.getElementById('headerTurnBanner');
+      banner.className = `flex items-center gap-2 px-3.5 py-1 rounded-2xl bg-gradient-to-r ${team.color} text-white font-display font-bold shadow border-2 border-white/60`;
+      document.getElementById('headerTeamIcon').innerHTML = `<i class="fa-solid ${team.icon}"></i>`;
+      document.getElementById('headerTeamName').textContent = team.name;
+      document.getElementById('rackOwnerLabel').textContent = `${team.name}'s Rack`;
+      document.getElementById('roundNumberBadge').textContent = `Round ${currentRound}`;
+    }
+
+    function renderScoreboard() {
+      const container = document.getElementById('scoreboardList');
+      container.innerHTML = teams.map((t, idx) => {
+        const isCurrent = idx === currentTeamIdx;
+        return `
+          <div class="rounded-xl p-2 border-2 transition-all flex items-center justify-between ${isCurrent ? 'bg-amber-50 border-amber-400 shadow scale-[1.01]' : 'bg-slate-50 border-slate-200 opacity-90'}">
+            <div class="flex items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br ${t.color} text-white flex items-center justify-center text-xs shadow-sm shrink-0">
+                <i class="fa-solid ${t.icon}"></i>
+              </div>
+              <div class="truncate">
+                <div class="flex items-center gap-1">
+                  <span class="font-display font-bold text-sm text-slate-900 truncate">${t.name}</span>
+                  ${isCurrent ? '<span class="text-[9px] font-extrabold uppercase bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded-full">Turn</span>' : ''}
+                </div>
+                <div class="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
+                  <span>${t.wordsCount}w</span>
+                  <button onclick="adjustTeamScore(${idx}, 2)" title="Teacher: Add +2 Bonus Points" class="text-[9px] bg-slate-200 hover:bg-emerald-200 text-slate-700 px-1 rounded font-extrabold">+2</button>
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0 ml-1">
+              <span class="font-display font-bold text-xl text-indigo-950">${t.score}</span>
+              <span class="text-[9px] font-extrabold uppercase text-slate-400 ml-0.5">pts</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function adjustTeamScore(teamIdx, delta) {
+      teams[teamIdx].score = Math.max(0, teams[teamIdx].score + delta);
+      playPop(600);
+      renderScoreboard();
+    }
+
+    function renderBoardGrid() {
+      const gridEl = document.getElementById('upwordsGrid');
+      gridEl.innerHTML = '';
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = board[r][c];
+          const topLetter = getCellTopLetter(r, c, false);
+          const height = getCellHeight(r, c, false);
+          const isCenterStart = (r === 3 || r === 4) && (c === 3 || c === 4);
+          const hintObj = activeHintCells.find(h => h.r === r && h.c === c);
+
+          const cellDiv = document.createElement('div');
+          cellDiv.ondragover = (e) => e.preventDefault();
+          cellDiv.ondrop = (e) => handleCellDrop(e, r, c);
+          cellDiv.onclick = () => handleBoardCellClick(r, c);
+          cellDiv.onmouseenter = () => inspectCellStack(r, c);
+
+          if (topLetter) {
+            const isPending = !!cell.pending;
+            const stackClass = `tile-stack-${Math.min(height, 5)}`;
+            const stateClass = isPending ? 'tile-pending' : 'tile-locked';
+            const hintClass = hintObj ? 'hint-target-cell' : '';
+
+            cellDiv.className = `board-cell ${stateClass} ${stackClass} ${hintClass} flex flex-col items-center justify-center select-none animate-pop`;
+            cellDiv.innerHTML = `
+              <span class="absolute top-0.5 right-1 text-[9px] sm:text-[10px] font-extrabold px-1 rounded-full ${
+                height >= 4 ? 'bg-rose-600 text-white' : height >= 2 ? 'bg-indigo-950 text-amber-300' : 'bg-amber-900/15 text-amber-950'
+              }">x${height}</span>
+              <span class="font-display font-bold text-xl sm:text-2xl leading-none mt-0.5">${topLetter}</span>
+              ${hintObj && !isPending ? `<span class="absolute -bottom-1 bg-emerald-600 text-white text-[9px] font-extrabold px-1 rounded shadow">➔ ${hintObj.letter}</span>` : ''}
+            `;
+          } else {
+            const baseBg = isCenterStart
+              ? 'bg-indigo-900/90 border-2 border-amber-400/60 text-amber-300/70'
+              : 'bg-slate-800/85 border border-indigo-500/30 text-indigo-400/30';
+            const hintClass = hintObj ? 'hint-target-cell bg-emerald-500/30' : '';
+
+            cellDiv.className = `board-cell ${baseBg} ${hintClass} flex flex-col items-center justify-center hover:bg-indigo-800/80`;
+            if (hintObj) {
+              cellDiv.innerHTML = `<span class="font-display font-bold text-lg text-emerald-300">${hintObj.letter}</span>`;
+            } else if (isCenterStart) {
+              cellDiv.innerHTML = `<i class="fa-solid fa-star text-xs"></i>`;
+            } else {
+              cellDiv.innerHTML = `<span class="text-[8px] font-bold">${String.fromCharCode(65 + c)}${r + 1}</span>`;
+            }
+          }
+          gridEl.appendChild(cellDiv);
+        }
+      }
+    }
+
+    function inspectCellStack(r, c) {
+      const cell = board[r][c];
+      const box = document.getElementById('stackInspectorContent');
+      const coord = `${String.fromCharCode(65 + c)}${r + 1}`;
+      const allLetters = [...cell.stack];
+      if (cell.pending) allLetters.push(cell.pending.letter);
+
+      if (allLetters.length === 0) {
+        box.innerHTML = `<span class="text-slate-500">Square <strong>${coord}</strong> is empty. Tap a tile below, then tap here!</span>`;
+        return;
+      }
+
+      const layersHtml = allLetters.map((ltr, idx) => {
+        const isTop = idx === allLetters.length - 1;
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded font-display font-bold text-xs ${
+          isTop ? 'bg-amber-400 text-slate-950' : 'bg-slate-200 text-slate-600'
+        }">#${idx + 1}: ${ltr}</span>`;
+      }).join(' ➔ ');
+
+      box.innerHTML = `
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-extrabold text-indigo-950">Square ${coord} (Height x${allLetters.length}/5)</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-1">${layersHtml}</div>
+      `;
+    }
+
+    function renderTeamRack() {
+      const team = teams[currentTeamIdx];
+      if (!team) return;
+      const container = document.getElementById('letterRackContainer');
+      container.innerHTML = '';
+
+      team.rack.forEach((tileObj, idx) => {
+        const div = document.createElement('div');
+        if (tileObj.used) {
+          div.className = "h-12 sm:h-14 rounded-xl border-2 border-dashed border-slate-300 bg-slate-100/60 flex items-center justify-center text-slate-300 font-display font-bold text-base";
+          div.innerHTML = `<i class="fa-solid fa-check text-xs"></i>`;
+        } else {
+          const isSelected = selectedRackIdx === idx;
+          div.className = `rack-tile h-12 sm:h-14 rounded-xl flex flex-col items-center justify-center select-none ${isSelected ? 'selected' : ''}`;
+          div.draggable = true;
+          div.ondragstart = (e) => {
+            selectedRackIdx = idx;
+            e.dataTransfer.setData('text/plain', idx);
+          };
+          div.onclick = () => {
+            selectedRackIdx = (selectedRackIdx === idx) ? null : idx;
+            playPop(560);
+            renderTeamRack();
+          };
+          div.innerHTML = `
+            <span class="font-display font-bold text-xl sm:text-2xl text-slate-900 leading-none">${tileObj.letter}</span>
+            <span class="text-[8px] font-extrabold text-amber-800 uppercase">Tap</span>
+          `;
+        }
+        container.appendChild(div);
+      });
+    }
+
+    // Renders clickable pills for every word currently on the board so pupils can click a word to check stacking!
+    function renderLiveBoardWordsPills() {
+      const container = document.getElementById('liveBoardWordsPills');
+      const boardWords = findAllExistingBoardWords();
+      if (boardWords.length === 0) {
+        container.innerHTML = `<span class="text-xs font-bold text-slate-400">No words on board yet. Build the first word!</span>`;
+        return;
+      }
+
+      container.innerHTML = boardWords.map((bw, idx) => `
+        <button onclick="openStackCheckerForBoardWord(${idx})" class="btn-3d bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border-2 border-emerald-400 font-display font-bold text-sm px-3 py-1 rounded-xl shadow-[0_2px_0_#059669] flex items-center gap-1.5">
+          <span>${bw.word}</span>
+          <i class="fa-solid fa-layer-group text-emerald-600 text-xs"></i>
+        </button>
+      `).join('');
+    }
+
+    function renderWordHistory() {
+      const list = document.getElementById('wordHistoryList');
+      const countBadge = document.getElementById('totalWordsCountBadge');
+      countBadge.textContent = `${playedWordsHistory.length} word${playedWordsHistory.length === 1 ? '' : 's'}`;
+
+      if (playedWordsHistory.length === 0) {
+        list.innerHTML = `<div class="text-center py-4 text-slate-400 text-xs font-bold">No words played yet!</div>`;
+        return;
+      }
+
+      // Show latest 4 words so it never needs a scrollbar
+      const latestFour = [...playedWordsHistory].reverse().slice(0, 4);
+      list.innerHTML = latestFour.map(item => `
+        <div onclick="speakWordAloud('${item.word}')" class="bg-slate-50 hover:bg-indigo-50 border border-slate-200 rounded-xl px-2.5 py-1.5 cursor-pointer transition flex items-center justify-between">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="font-display font-bold text-sm text-indigo-950">${item.word}</span>
+            <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-full ${item.isStacked ? 'bg-cyan-100 text-cyan-900' : 'bg-amber-100 text-amber-900'}">
+              ${item.isStacked ? 'Stack' : 'Flat'}
+            </span>
+            <span class="text-[10px] font-bold text-slate-400 truncate">${item.teamName}</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="font-display font-bold text-sm text-emerald-600">+${item.points}</span>
+            <i class="fa-solid fa-volume-high text-[10px] text-indigo-400"></i>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    /*************************************************************************
+     * 7. PLACING, STACKING & REMOVING TILES ON THE BOARD
+     *************************************************************************/
+    function handleCellDrop(e, r, c) {
+      e.preventDefault();
+      const idx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+      if (!isNaN(idx)) {
+        selectedRackIdx = idx;
+        placeSelectedTileOnBoard(r, c);
+      }
+    }
+
+    function handleBoardCellClick(r, c) {
+      const cell = board[r][c];
+      const team = teams[currentTeamIdx];
+
+      if (cell.pending && selectedRackIdx === null) {
+        const rackIdx = cell.pending.rackIdx;
+        if (team.rack[rackIdx]) team.rack[rackIdx].used = false;
+        cell.pending = null;
+        playPop(380);
+        renderAllGameUI();
+        setFeedback('info', 'Tile returned to your rack.');
+        return;
+      }
+
+      if (selectedRackIdx === null) {
+        inspectCellStack(r, c);
+        setFeedback('info', 'First tap a letter tile from your rack below, then tap a board square!');
+        playPop(350);
+        return;
+      }
+
+      placeSelectedTileOnBoard(r, c);
+    }
+
+    function placeSelectedTileOnBoard(r, c) {
+      const cell = board[r][c];
+      const team = teams[currentTeamIdx];
+      const tileObj = team.rack[selectedRackIdx];
+      if (!tileObj || tileObj.used) return;
+
+      if (cell.pending) {
+        if (team.rack[cell.pending.rackIdx]) team.rack[cell.pending.rackIdx].used = false;
+        cell.pending = null;
+      }
+
+      if (cell.stack.length >= 5) {
+        playBoing();
+        setFeedback('error', 'Max stack height is 5 tiles (x5)!');
+        return;
+      }
+
+      const currentTop = getCellTopLetter(r, c, true);
+      if (currentTop && currentTop === tileObj.letter) {
+        playBoing();
+        setFeedback('error', `You cannot stack "${tileObj.letter}" on top of the exact same letter "${currentTop}"!`);
+        return;
+      }
+
+      cell.pending = {
+        letter: tileObj.letter,
+        rackIdx: selectedRackIdx
+      };
+      tileObj.used = true;
+      selectedRackIdx = null;
+      activeHintCells = [];
+
+      const newHeight = getCellHeight(r, c, false);
+      playStackSound(newHeight);
+      renderAllGameUI();
+      inspectCellStack(r, c);
+    }
+
+    function recallPendingTiles() {
+      const team = teams[currentTeamIdx];
+      let recalled = 0;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (board[r][c].pending) {
+            const rIdx = board[r][c].pending.rackIdx;
+            if (team && team.rack[rIdx]) team.rack[rIdx].used = false;
+            board[r][c].pending = null;
+            recalled++;
+          }
+        }
+      }
+      selectedRackIdx = null;
+      document.getElementById('teacherOverrideBtn').classList.add('hidden');
+      if (recalled > 0) playPop(400);
+      renderAllGameUI();
+      setFeedback('info', 'Tiles returned to your rack.');
+    }
+
+    function swapNewRackLetters() {
+      recallPendingTiles();
+      const team = teams[currentTeamIdx];
+      team.rack = generateSmartRackForBoard();
+      playMagicChime();
+      renderAllGameUI();
+      setFeedback('success', `7 new helpful letters dealt for ${team.name}!`);
+    }
+
+    function passTurnToNextTeam() {
+      recallPendingTiles();
+      playPop(420);
+      advanceTurn();
+    }
+
+    /*************************************************************************
+     * 8. FORGIVING CLASSROOM WORD VALIDATION + LIVE INTERNET CHECK
+     *    (Guarantees words like "BUS" are always accepted!)
+     *************************************************************************/
+    function getPendingPositions() {
+      const list = [];
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (board[r][c].pending) {
+            list.push({ r, c, letter: board[r][c].pending.letter });
+          }
+        }
+      }
+      return list;
+    }
+
+    function evaluateCurrentTurnMove() {
+      const pending = getPendingPositions();
+      if (pending.length === 0) {
+        return { valid: false, reason: 'Place at least one letter tile on the board first!' };
+      }
+
+      const allSameRow = pending.every(p => p.r === pending[0].r);
+      const allSameCol = pending.every(p => p.c === pending[0].c);
+      if (!allSameRow && !allSameCol) {
+        return { valid: false, reason: 'Place your tiles in a single straight row OR column!' };
+      }
+
+      if (allSameRow) {
+        const r = pending[0].r;
+        const minC = Math.min(...pending.map(p => p.c));
+        const maxC = Math.max(...pending.map(p => p.c));
+        for (let c = minC; c <= maxC; c++) {
+          if (!getCellTopLetter(r, c, false)) {
+            return { valid: false, reason: 'No empty gaps allowed inside your word!' };
+          }
+        }
+      } else {
+        const c = pending[0].c;
+        const minR = Math.min(...pending.map(p => p.r));
+        const maxR = Math.max(...pending.map(p => p.r));
+        for (let r = minR; r <= maxR; r++) {
+          if (!getCellTopLetter(r, c, false)) {
+            return { valid: false, reason: 'No empty gaps allowed inside your word!' };
+          }
+        }
+      }
+
+      // Collect candidate words along the primary axis and perpendicular axis
+      const rawFormedWords = collectFormedWordsForPending(pending, allSameRow);
+      if (rawFormedWords.length === 0) {
+        return { valid: false, reason: 'Your tiles must form a word of at least 2 connected letters!' };
+      }
+
+      // Filter out accidental 2-letter perpendicular touches if the main word itself is valid!
+      let formedWords = rawFormedWords.filter(fw => fw.isMainLine || VALID_WORDS_SET.has(fw.word));
+      if (formedWords.length === 0) {
+        formedWords = rawFormedWords;
+      }
+
+      let totalTurnPoints = 0;
+      const unknownWords = [];
+
+      formedWords.forEach(fw => {
+        const isStacked = fw.cells.some(pos => getCellHeight(pos.r, pos.c, false) > 1);
+        const wordPts = !isStacked
+          ? fw.word.length * 2
+          : fw.cells.reduce((sum, pos) => sum + getCellHeight(pos.r, pos.c, false), 0);
+        fw.points = wordPts;
+        fw.isStacked = isStacked;
+        totalTurnPoints += wordPts;
+
+        if (!VALID_WORDS_SET.has(fw.word)) {
+          unknownWords.push(fw.word);
+        }
+      });
+
+      if (pending.length === 7) totalTurnPoints += 20;
+
+      return {
+        valid: unknownWords.length === 0,
+        unknownWords,
+        formedWords,
+        totalTurnPoints
+      };
+    }
+
+    function collectFormedWordsForPending(pending, allSameRow) {
+      const wordsMap = new Map();
+      const mainIsHorizontal = pending.length > 1 ? allSameRow : true;
+
+      function scanLine(r, c, dr, dc, isMain) {
+        let sr = r, sc = c;
+        while (sr - dr >= 0 && sc - dc >= 0 && getCellTopLetter(sr - dr, sc - dc, false)) {
+          sr -= dr;
+          sc -= dc;
+        }
+        const cells = [];
+        let wordStr = '';
+        let cr = sr, cc = sc;
+        while (cr < GRID_SIZE && cc < GRID_SIZE && getCellTopLetter(cr, cc, false)) {
+          cells.push({ r: cr, c: cc });
+          wordStr += getCellTopLetter(cr, cc, false);
+          cr += dr;
+          cc += dc;
+        }
+        if (wordStr.length >= 2) {
+          const key = `${dr === 0 ? 'H' : 'V'}_${sr}_${sc}_${wordStr}`;
+          wordsMap.set(key, { word: wordStr, cells, isMainLine: isMain });
+        }
+      }
+
+      pending.forEach(p => {
+        scanLine(p.r, p.c, 0, 1, mainIsHorizontal);
+        scanLine(p.r, p.c, 1, 0, !mainIsHorizontal);
+      });
+
+      return Array.from(wordsMap.values());
+    }
+
+    // Live Internet Word Validator (Checks Datamuse API & DictionaryAPI so any real word is accepted!)
+    async function verifyWordOnline(word) {
+      const clean = word.toUpperCase().trim();
+      if (VALID_WORDS_SET.has(clean)) return true;
+
+      try {
+        const res = await fetch(`https://api.datamuse.com/words?sp=${clean.toLowerCase()}&md=d&max=1`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0 && data[0].word.toUpperCase() === clean && data[0].defs && data[0].defs.length > 0) {
+            VALID_WORDS_SET.add(clean);
+            const rawDef = data[0].defs[0].split('\t')[1] || 'A valid English word.';
+            PRIMARY_DEFINITIONS[clean] = { pos: "word", def: rawDef };
+            return true;
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const res2 = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${clean.toLowerCase()}`);
+        if (res2.ok) {
+          VALID_WORDS_SET.add(clean);
+          return true;
+        }
+      } catch (e) {}
+
+      return false;
+    }
+
+    function updateLiveTurnPreview() {
+      const badge = document.getElementById('liveTurnScorePreview');
+      const overrideBtn = document.getElementById('teacherOverrideBtn');
+      const pending = getPendingPositions();
+
+      if (pending.length === 0) {
+        badge.classList.add('hidden');
+        overrideBtn.classList.add('hidden');
+        return;
+      }
+
+      const evalRes = evaluateCurrentTurnMove();
+      if (evalRes.formedWords && evalRes.formedWords.length > 0) {
+        const wordNames = evalRes.formedWords.map(w => w.word).join(' + ');
+        badge.textContent = `${wordNames} (+${evalRes.totalTurnPoints} pts)`;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    async function submitTurn(teacherOverride = false) {
+      const evalRes = evaluateCurrentTurnMove();
+      const overrideBtn = document.getElementById('teacherOverrideBtn');
+
+      if (!evalRes.valid && !teacherOverride) {
+        if (evalRes.unknownWords && evalRes.unknownWords.length > 0) {
+          // Check live on the Internet before rejecting!
+          setFeedback('info', `Checking "${evalRes.unknownWords.join(', ')}" with online dictionary...`);
+          let allVerifiedOnline = true;
+          for (const uw of evalRes.unknownWords) {
+            const ok = await verifyWordOnline(uw);
+            if (!ok) allVerifiedOnline = false;
+          }
+          if (!allVerifiedOnline) {
+            playBoing();
+            const badWord = evalRes.unknownWords.join(', ');
+            setFeedback('error', `"${badWord}" not recognized. Check spelling, click "Help Here!", or Teacher can click Accept.`);
+            overrideBtn.classList.remove('hidden');
+            overrideBtn.classList.add('inline-flex');
+            return;
+          }
+        } else {
+          playBoing();
+          setFeedback('error', evalRes.reason);
+          overrideBtn.classList.add('hidden');
+          return;
+        }
+      }
+
+      if (teacherOverride && evalRes.unknownWords) {
+        evalRes.unknownWords.forEach(w => VALID_WORDS_SET.add(w));
+      }
+      overrideBtn.classList.add('hidden');
+
+      // Lock pending tiles onto the board
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (board[r][c].pending) {
+            board[r][c].stack.push(board[r][c].pending.letter);
+            board[r][c].pending = null;
+          }
+        }
+      }
+
+      const team = teams[currentTeamIdx];
+      team.score += evalRes.totalTurnPoints;
+      team.wordsCount += evalRes.formedWords.length;
+
+      evalRes.formedWords.forEach(fw => {
+        playedWordsHistory.push({
+          word: fw.word,
+          teamName: team.name,
+          points: fw.points,
+          isStacked: fw.isStacked
+        });
+      });
+
+      playFanfare();
+      launchConfetti(55);
+      const summaryWords = evalRes.formedWords.map(fw => fw.word).join(', ');
+      showFloatingScore(`+${evalRes.totalTurnPoints} pts! (${summaryWords})`);
+
+      advanceTurn(`Great job ${team.name}! Built "${summaryWords}" (+${evalRes.totalTurnPoints} pts)!`);
+    }
+
+    function advanceTurn(customBannerMsg = null) {
+      selectedRackIdx = null;
+      activeHintCells = [];
+
+      currentTeamIdx++;
+      if (currentTeamIdx >= teams.length) {
+        currentTeamIdx = 0;
+        currentRound++;
+      }
+
+      teams[currentTeamIdx].rack = generateSmartRackForBoard();
+      renderAllGameUI();
+      const nextTeam = teams[currentTeamIdx];
+      if (customBannerMsg) {
+        setFeedback('success', `${customBannerMsg} ➔ Next: ${nextTeam.name}!`);
+      } else {
+        setFeedback('info', `Now Playing: ${nextTeam.name}! Tap a tile below or click "Help Here!"`);
+      }
+    }
+
+    function setFeedback(type, message) {
+      const bar = document.getElementById('boardFeedbackBar');
+      const icon = document.getElementById('feedbackIcon');
+      const text = document.getElementById('feedbackText');
+
+      text.textContent = message;
+      if (type === 'error') {
+        bar.className = "w-full bg-rose-50 border-2 border-rose-400 rounded-2xl px-3.5 py-1.5 shadow flex items-center justify-between gap-2 shrink-0 min-h-[42px]";
+        icon.className = "w-7 h-7 rounded-lg bg-rose-500 text-white flex items-center justify-center font-bold text-sm shrink-0";
+        icon.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>`;
+      } else if (type === 'success') {
+        bar.className = "w-full bg-emerald-50 border-2 border-emerald-400 rounded-2xl px-3.5 py-1.5 shadow flex items-center justify-between gap-2 shrink-0 min-h-[42px]";
+        icon.className = "w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shrink-0";
+        icon.innerHTML = `<i class="fa-solid fa-star"></i>`;
+      } else {
+        bar.className = "w-full bg-white/95 border-2 border-indigo-200 rounded-2xl px-3.5 py-1.5 shadow flex items-center justify-between gap-2 shrink-0 min-h-[42px]";
+        icon.className = "w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm shrink-0";
+        icon.innerHTML = `<i class="fa-solid fa-hand-pointer"></i>`;
+      }
+    }
+
+    /*************************************************************************
+     * 9. "HELP HERE!" TAB 1: INTERACTIVE STACK CHECKER & EASY HINTS
+     *    - Click any word on the board -> Green "IT CAN BE STACKED!" Pop-Up!
+     *    - Shows clear Kid-Friendly Hint, Letter Option to Stack, & Word Choice
+     *************************************************************************/
+    let currentStackOptions = [];
+    let currentStackPage = 0;
+    const STACK_CARDS_PER_PAGE = 3;
+
+    function openHelpModal(defaultTab = 'stack') {
+      playMagicChime();
+      document.getElementById('helpModal').classList.remove('hidden');
+      switchHelpTab(defaultTab);
+    }
+
+    function closeHelpModal() {
+      playPop(400);
+      document.getElementById('helpModal').classList.add('hidden');
+    }
+
+    function switchHelpTab(tab) {
+      const stackTab = document.getElementById('helpTabStackContent');
+      const dictTab = document.getElementById('helpTabDictContent');
+      const btnStack = document.getElementById('tabBtnStack');
+      const btnDict = document.getElementById('tabBtnDict');
+
+      if (tab === 'stack') {
+        stackTab.classList.remove('hidden');
+        stackTab.classList.add('flex');
+        dictTab.classList.add('hidden');
+        dictTab.classList.remove('flex');
+        btnStack.className = "px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-white text-emerald-900 border-slate-200 -mb-[2px]";
+        btnDict.className = "px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-slate-200/70 text-slate-600 border-transparent";
+        initStackCheckerModal();
+      } else {
+        stackTab.classList.add('hidden');
+        stackTab.classList.remove('flex');
+        dictTab.classList.remove('hidden');
+        dictTab.classList.add('flex');
+        btnDict.className = "px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-white text-indigo-950 border-slate-200 -mb-[2px]";
+        btnStack.className = "px-4 py-2 rounded-t-2xl font-display font-bold text-sm sm:text-base flex items-center gap-2 border-t-2 border-x-2 transition bg-slate-200/70 text-slate-600 border-transparent";
+        initPrefixDictionaryModal();
+      }
+    }
+
+    function openStackCheckerForBoardWord(boardWordIdx) {
+      openHelpModal('stack');
+      const boardWords = findAllExistingBoardWords();
+      if (boardWords[boardWordIdx]) {
+        inspectWordForStacking(boardWords[boardWordIdx].word, boardWords[boardWordIdx]);
+      }
+    }
+
+    function initStackCheckerModal() {
+      recallPendingTiles();
+      const boardWords = findAllExistingBoardWords();
+      const pillsContainer = document.getElementById('stackModalBoardWords');
+
+      if (boardWords.length === 0) {
+        // If board is empty, show sample starter words they can test or build
+        const sampleWords = ['BUS', 'CAT', 'PLAY', 'BOOK', 'STAR'];
+        pillsContainer.innerHTML = sampleWords.map(w => `
+          <button onclick="inspectWordForStacking('${w}', null)" class="btn-3d bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border-2 border-emerald-400 font-display font-bold text-base px-4 py-1.5 rounded-xl shadow-[0_3px_0_#059669] flex items-center gap-2">
+            <span>${w}</span>
+            <span class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full">Tap to Check Stack!</span>
+          </button>
+        `).join('');
+        inspectWordForStacking('BUS', null);
+      } else {
+        pillsContainer.innerHTML = boardWords.map((bw, idx) => `
+          <button onclick="inspectWordForStacking('${bw.word}', findAllExistingBoardWords()[${idx}])" class="btn-3d bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border-2 border-emerald-400 font-display font-bold text-base px-4 py-1.5 rounded-xl shadow-[0_3px_0_#059669] flex items-center gap-2">
+            <i class="fa-solid fa-cubes-stacked text-emerald-600"></i>
+            <span>${bw.word}</span>
+            <span class="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-full">Click to Stack!</span>
+          </button>
+        `).join('');
+        inspectWordForStacking(boardWords[0].word, boardWords[0]);
+      }
+    }
+
+    function inspectWordForStacking(rawWord, boardWordObj = null) {
+      const word = (rawWord || '').trim().toUpperCase().replace(/[^A-Z]/g, '');
+      if (!word) return;
+
+      const team = teams[currentTeamIdx];
+      const rackLetters = team ? team.rack.map(t => t.letter) : [];
+      const alphabet = "ABCDEFGHIJKLMNOPRSTUVWYZ";
+      const options = [];
+
+      // Find all 1-letter stack transformations
+      for (let i = 0; i < word.length; i++) {
+        if (boardWordObj && board[boardWordObj.cells[i].r][boardWordObj.cells[i].c].stack.length >= 5) {
+          continue; // Max height reached on this square
+        }
+        for (const ch of alphabet) {
+          if (ch === word[i]) continue;
+          const candidate = word.slice(0, i) + ch + word.slice(i + 1);
+          const isEasyPrimary = !!PRIMARY_DEFINITIONS[candidate];
+          const isValid = isEasyPrimary || VALID_WORDS_SET.has(candidate);
+
+          if (isValid) {
+            const inRack = rackLetters.includes(ch);
+            const targetCell = boardWordObj ? boardWordObj.cells[i] : null;
+            const points = boardWordObj
+              ? boardWordObj.cells.reduce((sum, pos, idx) => sum + board[pos.r][pos.c].stack.length + (idx === i ? 1 : 0), 0)
+              : candidate.length + 1;
+
+            options.push({
+              oldWord: word,
+              newWord: candidate,
+              replaceIndex: i,
+              oldLetter: word[i],
+              newLetter: ch,
+              inRack,
+              isEasyPrimary,
+              points,
+              targetCell,
+              hint: PRIMARY_DEFINITIONS[candidate]
+                ? PRIMARY_DEFINITIONS[candidate].def
+                : `An English word formed by stacking "${ch}" on "${word[i]}" in ${word}.`
+            });
+          }
+        }
+      }
+
+      // Sort so easy primary-school words & letters currently in the team's rack appear first!
+      options.sort((a, b) => {
+        if (a.isEasyPrimary !== b.isEasyPrimary) return b.isEasyPrimary - a.isEasyPrimary;
+        if (a.inRack !== b.inRack) return b.inRack - a.inRack;
+        return b.points - a.points;
+      });
+
+      currentStackOptions = options;
+      currentStackPage = 0;
+
+      // Update the Green "IT CAN BE STACKED!" Pop-Up Banner
+      const banner = document.getElementById('greenStackableBanner');
+      const titleEl = document.getElementById('stackBannerTitle');
+      const targetEl = document.getElementById('stackBannerTargetWord');
+      const subEl = document.getElementById('stackBannerSubtitle');
+
+      if (options.length > 0) {
+        playFanfare();
+        banner.className = "my-2.5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 text-white rounded-2xl px-4 py-2.5 shadow-lg border-3 border-emerald-200 flex items-center justify-between shrink-0 green-stack-banner";
+        titleEl.textContent = "✅ IT CAN BE STACKED!";
+        targetEl.textContent = `Selected Word: "${word}" (${options.length} easy stacks found!)`;
+        subEl.textContent = `Read the simple hint below, see which letter to stack on "${word}", or tap Auto-Stack!`;
+      } else {
+        playBoing();
+        banner.className = "my-2.5 bg-gradient-to-r from-rose-500 to-orange-500 text-white rounded-2xl px-4 py-2.5 shadow-lg border-3 border-rose-200 flex items-center justify-between shrink-0";
+        titleEl.textContent = "⚠️ NO 1-LETTER STACKS FOUND";
+        targetEl.textContent = `Word: "${word}"`;
+        subEl.textContent = `Try selecting another word or build a new word next to "${word}"!`;
+      }
+
+      renderStackChoicesPage();
+    }
+
+    function changeStackHintPage(delta) {
+      const totalPages = Math.max(1, Math.ceil(currentStackOptions.length / STACK_CARDS_PER_PAGE));
+      currentStackPage = Math.min(Math.max(0, currentStackPage + delta), totalPages - 1);
+      playPop(500);
+      renderStackChoicesPage();
+    }
+
+    function renderStackChoicesPage() {
+      const grid = document.getElementById('stackChoicesGrid');
+      const pageInd = document.getElementById('stackPageIndicator');
+      const totalPages = Math.max(1, Math.ceil(currentStackOptions.length / STACK_CARDS_PER_PAGE));
+      pageInd.textContent = `${currentStackPage + 1} / ${totalPages}`;
+
+      document.getElementById('stackPrevBtn').disabled = currentStackPage === 0;
+      document.getElementById('stackNextBtn').disabled = currentStackPage >= totalPages - 1;
+
+      if (currentStackOptions.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-3 bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+            <p class="font-display font-bold text-lg text-slate-700">No single-letter stacks found for that word.</p>
+            <p class="text-xs font-bold text-slate-500 mt-1">Click another word button above or test a word like BUS, CAT, PLAY, or BOOK!</p>
+          </div>
+        `;
+        return;
+      }
+
+      const slice = currentStackOptions.slice(
+        currentStackPage * STACK_CARDS_PER_PAGE,
+        (currentStackPage + 1) * STACK_CARDS_PER_PAGE
+      );
+
+      grid.innerHTML = slice.map((opt, idx) => {
+        const globalIdx = currentStackPage * STACK_CARDS_PER_PAGE + idx;
+        // Visual tile breakdown showing which letter is stacked
+        const tilesHtml = opt.oldWord.split('').map((ch, i) => {
+          if (i === opt.replaceIndex) {
+            return `
+              <div class="flex flex-col items-center">
+                <span class="text-[9px] font-extrabold text-emerald-700 uppercase">Stack!</span>
+                <div class="w-9 h-9 rounded-xl bg-emerald-500 text-white font-display font-bold text-lg flex items-center justify-center shadow-[0_3px_0_#065f46] border-2 border-emerald-200">
+                  ${opt.newLetter}
+                </div>
+                <span class="text-[9px] font-bold text-slate-400">on ${opt.oldLetter}</span>
+              </div>
+            `;
+          }
+          return `
+            <div class="flex flex-col items-center">
+              <span class="text-[9px] opacity-0">.</span>
+              <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-950 font-display font-bold text-lg flex items-center justify-center border border-amber-300">
+                ${ch}
+              </div>
+              <span class="text-[9px] opacity-0">.</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-emerald-50/70 border-3 border-emerald-400 rounded-2xl p-3.5 shadow-md flex flex-col justify-between">
+            <div>
+              <!-- Top Badges -->
+              <div class="flex items-center justify-between gap-1 mb-2">
+                <span class="bg-emerald-600 text-white font-display font-bold text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <i class="fa-solid fa-check"></i> Stack Letter "${opt.newLetter}"
+                </span>
+                ${opt.inRack
+                  ? `<span class="bg-amber-300 text-slate-950 font-extrabold text-[10px] px-2 py-0.5 rounded-full border border-amber-500">⭐ In Your Rack!</span>`
+                  : `<span class="bg-indigo-100 text-indigo-800 font-extrabold text-[10px] px-2 py-0.5 rounded-full">+${opt.points} pts</span>`
+                }
+              </div>
+
+              <!-- Visual Tile Transformation -->
+              <div class="bg-white rounded-xl p-2 border border-emerald-200 flex items-center justify-center gap-1.5 mb-2">
+                ${tilesHtml}
+              </div>
+
+              <!-- Simple Kid-Friendly Hint -->
+              <div class="bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 leading-snug">
+                <span class="text-emerald-700 font-extrabold block mb-0.5"><i class="fa-solid fa-lightbulb text-amber-500 mr-1"></i>Easy Hint:</span>
+                "${opt.hint}"
+              </div>
+            </div>
+
+            <!-- Word Choice & Auto-Stack Action Buttons -->
+            <div class="mt-2.5 pt-2 border-t border-emerald-200/80 flex items-center justify-between gap-2">
+              <button onclick="speakWordAloud('${opt.newWord}')" class="btn-3d bg-white hover:bg-slate-100 text-indigo-950 border border-slate-300 font-display font-bold text-sm px-3 py-1.5 rounded-xl shadow-[0_2px_0_#cbd5e1] flex items-center gap-1.5" title="Hear pronunciation">
+                <i class="fa-solid fa-volume-high text-indigo-600"></i>
+                <span>${opt.newWord}</span>
+              </button>
+
+              <button onclick="applyStackChoiceToBoard(${globalIdx})" class="flex-grow btn-3d bg-gradient-to-b from-emerald-500 to-emerald-600 text-white font-display font-bold text-xs sm:text-sm py-1.5 px-3 rounded-xl shadow-[0_3px_0_#065f46] flex items-center justify-center gap-1">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span>Stack "${opt.newLetter}" Now!</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Places the chosen stack letter directly onto the board for the team (and puts the letter in their rack if needed!)
+    function applyStackChoiceToBoard(globalIdx) {
+      const opt = currentStackOptions[globalIdx];
+      if (!opt) return;
+
+      if (teams.length === 0) {
+        closeHelpModal();
+        goToSetupScreen();
+        return;
+      }
+
+      recallPendingTiles();
+      const team = teams[currentTeamIdx];
+
+      // Find if the team already has opt.newLetter in their rack; if not, set slot 0 to opt.newLetter so they can play it!
+      let rackIdx = team.rack.findIndex(t => !t.used && t.letter === opt.newLetter);
+      if (rackIdx === -1) {
+        rackIdx = 0;
+        team.rack[0] = { letter: opt.newLetter, used: false };
+      }
+
+      if (opt.targetCell) {
+        board[opt.targetCell.r][opt.targetCell.c].pending = {
+          letter: opt.newLetter,
+          rackIdx: rackIdx
+        };
+        team.rack[rackIdx].used = true;
+        activeHintCells = [{ r: opt.targetCell.r, c: opt.targetCell.c, letter: opt.newLetter }];
+      }
+
+      closeHelpModal();
+      playStackSound(2);
+      renderAllGameUI();
+      setFeedback('success', `Stacked "${opt.newLetter}" on "${opt.oldLetter}" to make "${opt.newWord}"! Now click "Submit Word!"`);
+    }
+
+    /*************************************************************************
+     * 10. "HELP HERE!" TAB 2: STARTING-LETTER PREFIX WORD FINDER DICTIONARY
+     *     - Pupils just tap 1, 2, or 3 starting letters (e.g. "S" "P")
+     *     - Immediately lists easy words starting with those letters!
+     *************************************************************************/
+    let currentPrefix = "SP";
+    let prefixMatchedWords = [];
+    let currentDictPage = 0;
+    const DICT_CARDS_PER_PAGE = 6;
+
+    function initPrefixDictionaryModal() {
+      renderAZKeypad();
+      renderDictRackShortcuts();
+      renderPrefixSlots();
+      runPrefixWordSearch(currentPrefix || "B");
+    }
+
+    function renderAZKeypad() {
+      const container = document.getElementById('azTouchKeypad');
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+      container.innerHTML = alphabet.map(ltr => `
+        <button onclick="tapPrefixLetter('${ltr}')" class="btn-3d bg-white hover:bg-indigo-600 hover:text-white text-indigo-950 font-display font-bold text-sm sm:text-base py-1.5 rounded-xl border-2 border-indigo-200 shadow-[0_2px_0_#a5b4fc] transition">
+          ${ltr}
+        </button>
+      `).join('');
+    }
+
+    function renderDictRackShortcuts() {
+      const container = document.getElementById('dictRackQuickButtons');
+      const team = teams[currentTeamIdx];
+      if (!team || !team.rack) {
+        container.innerHTML = `<span class="text-xs text-slate-400">—</span>`;
+        return;
+      }
+      container.innerHTML = team.rack.map(t => `
+        <button onclick="tapPrefixLetter('${t.letter}')" class="w-7 h-7 rounded-lg bg-amber-300 hover:bg-amber-400 text-slate-950 font-display font-bold text-sm shadow-sm border border-amber-500">
+          ${t.letter}
+        </button>
+      `).join('');
+    }
+
+    function renderPrefixSlots() {
+      const container = document.getElementById('prefixSlotsContainer');
+      const chars = currentPrefix.split('');
+      let html = '';
+      for (let i = 0; i < 4; i++) {
+        if (chars[i]) {
+          html += `
+            <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white font-display font-bold text-lg flex items-center justify-center shadow-[0_2px_0_#312e81]">
+              ${chars[i]}
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="w-9 h-9 rounded-xl bg-white border-2 border-dashed border-indigo-300 text-indigo-300 font-display font-bold text-sm flex items-center justify-center">
+              ?
+            </div>
+          `;
+        }
+      }
+      container.innerHTML = html;
+    }
+
+    function tapPrefixLetter(ltr) {
+      if (currentPrefix.length >= 4) {
+        currentPrefix = ltr;
+      } else {
+        currentPrefix += ltr;
+      }
+      playPop(540);
+      renderPrefixSlots();
+      runPrefixWordSearch(currentPrefix);
+    }
+
+    function backspacePrefixLetter() {
+      currentPrefix = currentPrefix.slice(0, -1);
+      playPop(420);
+      renderPrefixSlots();
+      runPrefixWordSearch(currentPrefix);
+    }
+
+    function clearPrefixLetters() {
+      currentPrefix = "";
+      playPop(380);
+      renderPrefixSlots();
+      runPrefixWordSearch("");
+    }
+
+    async function runPrefixWordSearch(prefix) {
+      const cleanPrefix = (prefix || "").toUpperCase().replace(/[^A-Z]/g, '');
+      const heading = document.getElementById('dictMatchingHeading');
+      const statusBadge = document.getElementById('dictOnlineStatusBadge');
+
+      if (!cleanPrefix) {
+        heading.textContent = "Tap any letter button above (e.g., B, C, or S + P) to see words!";
+        prefixMatchedWords = EASY_PRIMARY_WORDS.slice(0, 18).map(w => ({
+          word: w,
+          def: PRIMARY_DEFINITIONS[w].def,
+          isCurated: true
+        }));
+        currentDictPage = 0;
+        renderPrefixWordsPage();
+        return;
+      }
+
+      heading.textContent = `Words Starting With "${cleanPrefix}..."`;
+
+      // 1. Gather curated primary school words first (shortest & easiest first)
+      const curatedMatches = EASY_PRIMARY_WORDS
+        .filter(w => w.startsWith(cleanPrefix))
+        .map(w => ({
+          word: w,
+          def: PRIMARY_DEFINITIONS[w].def,
+          isCurated: true
+        }));
+
+      // 2. Gather built-in valid words (3 to 6 letters) starting with prefix
+      const builtinMatches = [];
+      VALID_WORDS_SET.forEach(w => {
+        if (w.startsWith(cleanPrefix) && !PRIMARY_DEFINITIONS[w] && w.length >= 3 && w.length <= 6) {
+          builtinMatches.push({
+            word: w,
+            def: `${w.length}-letter English word starting with "${cleanPrefix}".`,
+            isCurated: false
+          });
+        }
+      });
+      builtinMatches.sort((a, b) => a.word.length - b.word.length || a.word.localeCompare(b.word));
+
+      prefixMatchedWords = [...curatedMatches, ...builtinMatches.slice(0, 24)];
+      currentDictPage = 0;
+      renderPrefixWordsPage();
+
+      // 3. Also query live Datamuse API over the internet to enrich definitions and find more words!
+      try {
+        statusBadge.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i>Checking Online Dictionary...`;
+        const res = await fetch(`https://api.datamuse.com/words?sp=${cleanPrefix.toLowerCase()}*&md=d&max=25`);
+        if (res.ok) {
+          const data = await res.json();
+          const seen = new Set(prefixMatchedWords.map(item => item.word));
+          data.forEach(entry => {
+            const w = (entry.word || '').toUpperCase().replace(/[^A-Z]/g, '');
+            if (w.length >= 3 && w.length <= 6 && w.startsWith(cleanPrefix) && entry.defs && entry.defs.length > 0) {
+              const rawDef = entry.defs[0].split('\t')[1] || '';
+              VALID_WORDS_SET.add(w);
+              if (!PRIMARY_DEFINITIONS[w] && rawDef) {
+                PRIMARY_DEFINITIONS[w] = { pos: "word", def: rawDef };
+              }
+              if (!seen.has(w)) {
+                seen.add(w);
+                prefixMatchedWords.push({
+                  word: w,
+                  def: rawDef || `${w.length}-letter English word.`,
+                  isCurated: true
+                });
+              } else {
+                // Upgrade generic definition if found online
+                const existing = prefixMatchedWords.find(item => item.word === w);
+                if (existing && !existing.isCurated && rawDef) {
+                  existing.def = rawDef;
+                }
+              }
+            }
+          });
+          statusBadge.innerHTML = `<i class="fa-solid fa-wifi mr-1"></i>Online Words Ready (${prefixMatchedWords.length} found)`;
+          renderPrefixWordsPage();
+        }
+      } catch (e) {
+        statusBadge.innerHTML = `<i class="fa-solid fa-check-circle mr-1"></i>Built-in Primary Dictionary`;
+      }
+    }
+
+    function changeDictPage(delta) {
+      const totalPages = Math.max(1, Math.ceil(prefixMatchedWords.length / DICT_CARDS_PER_PAGE));
+      currentDictPage = Math.min(Math.max(0, currentDictPage + delta), totalPages - 1);
+      playPop(500);
+      renderPrefixWordsPage();
+    }
+
+    function renderPrefixWordsPage() {
+      const grid = document.getElementById('prefixWordsGrid');
+      const pageInd = document.getElementById('dictPageIndicator');
+      const totalPages = Math.max(1, Math.ceil(prefixMatchedWords.length / DICT_CARDS_PER_PAGE));
+      pageInd.textContent = `Page ${currentDictPage + 1} / ${totalPages}`;
+
+      document.getElementById('dictPrevBtn').disabled = currentDictPage === 0;
+      document.getElementById('dictNextBtn').disabled = currentDictPage >= totalPages - 1;
+
+      if (prefixMatchedWords.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-3 bg-slate-50 border-2 border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+            <p class="font-display font-bold text-lg text-slate-700">No words found starting with "${currentPrefix}".</p>
+            <p class="text-xs font-bold text-slate-500 mt-1">Click "Back" or "Clear" above and try 1 or 2 letters like "B", "CA", "SP", or "ST"!</p>
+          </div>
+        `;
+        return;
+      }
+
+      const slice = prefixMatchedWords.slice(
+        currentDictPage * DICT_CARDS_PER_PAGE,
+        (currentDictPage + 1) * DICT_CARDS_PER_PAGE
+      );
+
+      grid.innerHTML = slice.map(item => {
+        const prefixLen = currentPrefix.length;
+        const wordTiles = item.word.split('').map((ch, i) => `
+          <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg font-display font-bold text-sm border ${
+            i < prefixLen
+              ? 'bg-indigo-600 text-white border-indigo-700'
+              : 'bg-amber-100 text-amber-950 border-amber-300'
+          }">${ch}</span>
+        `).join('');
+
+        return `
+          <div class="bg-white border-2 border-indigo-200 rounded-2xl p-3 shadow-sm flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-1 mb-1.5">
+                <div class="flex items-center gap-1">${wordTiles}</div>
+                <button onclick="speakWordAloud('${item.word}')" class="w-7 h-7 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs" title="Hear Word">
+                  <i class="fa-solid fa-volume-high"></i>
+                </button>
+              </div>
+              <p class="text-xs font-bold text-slate-600 line-clamp-2 leading-snug">
+                ${item.def}
+              </p>
+            </div>
+
+            <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
+              <span class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                Flat: ${item.word.length * 2} pts
+              </span>
+              <button onclick="loadWordLettersIntoTeamRack('${item.word}')" class="btn-3d bg-amber-400 hover:bg-amber-300 text-slate-950 font-display font-bold text-[11px] px-2.5 py-1 rounded-lg shadow-[0_2px_0_#b45309] flex items-center gap-1">
+                <i class="fa-solid fa-hand-Sparkles"></i> Give Team These Letters
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Lets a team load the letters of a discovered word into their rack so they can spell it on the board!
+    function loadWordLettersIntoTeamRack(word) {
+      if (teams.length === 0) {
+        closeHelpModal();
+        goToSetupScreen();
+        return;
+      }
+      recallPendingTiles();
+      const team = teams[currentTeamIdx];
+      const letters = word.toUpperCase().split('').slice(0, 7);
+      const extraPool = ['A', 'E', 'I', 'O', 'S', 'T', 'R', 'N'];
+
+      while (letters.length < 7) {
+        letters.push(extraPool[Math.floor(Math.random() * extraPool.length)]);
+      }
+
+      team.rack = letters.map(ch => ({ letter: ch, used: false }));
+      closeHelpModal();
+      playMagicChime();
+      renderAllGameUI();
+      setFeedback('success', `Loaded letters for "${word}" into ${team.name}'s rack! Tap the tiles below to place them on the board!`);
+    }
+
+    /*************************************************************************
+     * 11. TIMER, END GAME PODIUM & CONFETTI CELEBRATION
+     *************************************************************************/
+    function tickGameTimer() {
+      if (isTimerPaused) return;
+      if (remainingSeconds > 0) {
+        remainingSeconds--;
+        updateTimerUI();
+      } else {
+        clearInterval(timerInterval);
+        finishGame();
+      }
+    }
+
+    function updateTimerUI() {
+      const mins = Math.floor(remainingSeconds / 60);
+      const secs = remainingSeconds % 60;
+      const disp = document.getElementById('timerDisplay');
+      disp.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+      if (remainingSeconds <= 30) {
+        disp.className = "font-display font-bold text-xl sm:text-2xl tracking-wider text-rose-400 tabular-nums animate-bounce";
+      } else {
+        disp.className = "font-display font-bold text-xl sm:text-2xl tracking-wider text-white tabular-nums";
+      }
+    }
+
+    function togglePauseTimer() {
+      isTimerPaused = !isTimerPaused;
+      playPop(460);
+      const btn = document.getElementById('pauseTimerBtn');
+      btn.innerHTML = isTimerPaused
+        ? `<i class="fa-solid fa-play text-xs text-emerald-300"></i>`
+        : `<i class="fa-solid fa-pause text-xs"></i>`;
+    }
+
+    function pauseTimer() {
+      isTimerPaused = true;
+      const btn = document.getElementById('pauseTimerBtn');
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-play text-xs text-emerald-300"></i>`;
+    }
+
+    function addExtraMinute() {
+      remainingSeconds += 60;
+      playPop(640);
+      updateTimerUI();
+    }
+
+    function finishGame() {
+      if (timerInterval) clearInterval(timerInterval);
+      closeHelpModal();
+      closeRulesModal();
+      playFanfare();
+      launchConfetti(120);
+
+      showScreen('winnerScreen');
+
+      const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+      const podium = document.getElementById('podiumContainer');
+
+      podium.innerHTML = sortedTeams.slice(0, 3).map((t, idx) => {
+        const medals = ['🥇 1st Place', '🥈 2nd Place', '🥉 3rd Place'];
+        const styles = [
+          'border-amber-400 bg-amber-50/90 py-5',
+          'border-slate-300 bg-slate-50 py-4',
+          'border-orange-300 bg-orange-50/60 py-3'
+        ];
+        return `
+          <div class="rounded-3xl border-4 ${styles[idx]} px-4 flex flex-col items-center justify-between shadow-xl">
+            <span class="text-xs font-extrabold uppercase tracking-wider px-3 py-0.5 rounded-full bg-white border border-slate-200">${medals[idx]}</span>
+            <div class="my-2 flex flex-col items-center">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-br ${t.color} text-white flex items-center justify-center text-xl shadow mb-1">
+                <i class="fa-solid ${t.icon}"></i>
+              </div>
+              <h3 class="font-display font-bold text-xl text-slate-900">${t.name}</h3>
+              <p class="text-xs font-bold text-slate-500">${t.wordsCount} words built</p>
+            </div>
+            <div class="font-display font-bold text-3xl text-indigo-950">${t.score} <span class="text-sm text-slate-500">pts</span></div>
+          </div>
+        `;
+      }).join('');
+
+      const realWords = playedWordsHistory.filter(w => w.points > 0);
+      const bestWordObj = realWords.length > 0
+        ? realWords.reduce((best, cur) => cur.points > best.points ? cur : best, realWords[0])
+        : null;
+
+      document.getElementById('sessionStatsRow').innerHTML = `
+        <div class="bg-indigo-50 border-2 border-indigo-200 rounded-2xl p-3">
+          <div class="text-xs font-extrabold uppercase text-indigo-600">Total Words</div>
+          <div class="font-display font-bold text-2xl text-indigo-950">${playedWordsHistory.length}</div>
+        </div>
+        <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3">
+          <div class="text-xs font-extrabold uppercase text-emerald-700">Best Word</div>
+          <div class="font-display font-bold text-xl text-emerald-950">${bestWordObj ? `${bestWordObj.word} (+${bestWordObj.points})` : '—'}</div>
+        </div>
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3">
+          <div class="text-xs font-extrabold uppercase text-amber-800">Champion</div>
+          <div class="font-display font-bold text-xl text-amber-950 truncate">${sortedTeams[0] ? sortedTeams[0].name : '—'}</div>
+        </div>
+      `;
+    }
+
+    function showFloatingScore(text) {
+      const container = document.getElementById('floatingScoreContainer');
+      const el = document.createElement('div');
+      el.className = "fixed left-1/2 top-1/3 -translate-x-1/2 bg-gradient-to-r from-amber-400 to-emerald-400 text-slate-950 font-display font-bold text-2xl sm:text-3xl px-6 py-2.5 rounded-3xl shadow-2xl border-4 border-white transition-all duration-1000 opacity-100";
+      el.textContent = text;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.transform = 'translate(-50%, -80px) scale(1.08)';
+        el.style.opacity = '0';
+      }, 60);
+      setTimeout(() => el.remove(), 1050);
+    }
+
+    function launchConfetti(count = 60) {
+      const canvas = document.getElementById('confettiCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const colors = ['#fbbf24', '#38bdf8', '#34d399', '#f43f5e', '#a855f7', '#f97316'];
+      const particles = Array.from({ length: count }, () => ({
+        x: window.innerWidth / 2 + (Math.random() - 0.5) * 300,
+        y: window.innerHeight / 2,
+        vx: (Math.random() - 0.5) * 15,
+        vy: -Math.random() * 14 - 5,
+        size: Math.random() * 9 + 5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        rot: Math.random() * 360,
+        vRot: (Math.random() - 0.5) * 12
+      }));
+
+      let frame = 0;
+      function animate() {
+        frame++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.42;
+          p.rot += p.vRot;
+          if (p.y < canvas.height + 20) alive = true;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate((p.rot * Math.PI) / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.65);
+          ctx.restore();
+        });
+        if (alive && frame < 130) {
+          requestAnimationFrame(animate);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      animate();
+    }
+
+    function openRulesModal() {
+      playPop(500);
+      document.getElementById('rulesModal').classList.remove('hidden');
+    }
+
+    function closeRulesModal() {
+      playPop(420);
+      document.getElementById('rulesModal').classList.add('hidden');
+    }
+
+    // Start BGM on first user click anywhere if not muted
+    window.addEventListener('click', () => {
+      if (!bgmStarted && !isBgmMuted) {
+        tryStartBgm();
+      }
+    }, { once: true });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderHeroDemo();
+      renderSetupScreen();
+    });
+  </script>
+</body>
+</html>
