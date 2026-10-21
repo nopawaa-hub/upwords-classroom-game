@@ -2194,13 +2194,16 @@
 
           letters.forEach((ltr, i) => {
             const isTop = i === letters.length - 1;
+            const letterMat = new THREE.MeshStandardMaterial({
+              map: makeLetterTexture(ltr, { pending: isPending && isTop })
+            });
             const mats = [
               new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 }), // right
               new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 }), // left
-              new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 }), // top
+              letterMat,                                                            // TOP — letter on top face
               new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 }), // bottom
-              new THREE.MeshStandardMaterial({ map: makeLetterTexture(ltr, { pending: isPending && isTop }) }), // front
-              new THREE.MeshStandardMaterial({ map: makeLetterTexture(ltr, { pending: isPending && isTop }) })  // back
+              new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 }), // front
+              new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 })  // back
             ];
             const tile = new THREE.Mesh(tileGeo, mats);
             tile.position.y = TILE_H / 2 + i * TILE_H;
