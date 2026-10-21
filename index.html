@@ -6,6 +6,9 @@
   <title>UpWords Tryout! — Smartboard Classroom Team Word Game</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js for real 3D board -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <!-- Google Fonts: Fredoka & Nunito for a cheerful, high-legibility Smartboard UI -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -532,10 +535,15 @@
             <span class="text-[10px] font-extrabold text-indigo-300/80">H</span>
           </div>
 
-          <!-- 8x8 Grid Cells -->
-          <div id="upwordsGrid" class="grid grid-cols-8 gap-1 sm:gap-1.5 flex-grow">
-            <!-- 64 cells generated dynamically by JS -->
+          <!-- 8x8 Grid Cells: real 3D board rendered by Three.js -->
+          <div id="board3dWrap" class="relative w-full flex-grow min-h-0 rounded-2xl overflow-hidden">
+            <canvas id="board3dCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+            <div class="absolute bottom-1 right-2 text-[9px] font-bold text-indigo-300/60 pointer-events-none select-none">
+              drag = rotate • wheel = zoom • right-drag = pan
+            </div>
           </div>
+          <!-- Legacy DOM grid kept hidden for any fallback logic -->
+          <div id="upwordsGrid" class="grid grid-cols-8 gap-1 sm:gap-1.5 flex-grow" style="display:none"></div>
         </div>
 
         <!-- TEAM LETTER RACK & ACTION CONTROLS (Compact Bottom Dock) -->
@@ -1880,6 +1888,361 @@
         }
       }
     }
+
+    // ===================== THREE.JS 3D BOARD ENGINE =====================
+    // Mirrors the game state (board[r][c].stack / .pending) into a real 3D scene.
+    // All rules stay in the 2D logic; this layer only VISUALIZES + forwards clicks.
+
+    const B3D = {
+      scene: null, camera: null, renderer: null, controls: null, raycaster: null,
+      cellMeshes: [],         // 64 invisible pick plates (one per square)
+      stackGroups: null,      // group holding all letter stacks
+      hoverPlate: null,       // green highlight plate under cursor
+      hovered: null,          // {r, c}
+      letterTexCache: {},     // letter -> canvas texture
+      needsRender: true,
+      inited: false,
+      animId: null,
+      lastPlacementTime: 0
+    };
+
+    const CELL = 1;           // world units per square
+    const TILE_H = 0.22;      // height of one letter tile
+    const BOARD_N = 8;
+
+    function makeLetterTexture(letter, opts = {}) {
+      const key = letter + (opts.pending ? 'p' : '') + (opts.small ? 's' : '');
+      if (B3D.letterTexCache[key]) return B3D.letterTexCache[key];
+      const size = 256;
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = size;
+      const g = cv.getContext('2d');
+      if (opts.pending) {
+        const grad = g.createLinearGradient(0, 0, 0, size);
+        grad.addColorStop(0, '#67e8f9'); grad.addColorStop(1, '#06b6d4');
+        g.fillStyle = grad;
+      } else {
+        const grad = g.createLinearGradient(0, 0, 0, size);
+        grad.addColorStop(0, '#fffbeb'); grad.addColorStop(1, '#fde68a');
+        g.fillStyle = grad;
+      }
+      g.fillRect(0, 0, size, size);
+      // border
+      g.strokeStyle = opts.pending ? '#cffafe' : '#fef3c7';
+      g.lineWidth = 14;
+      g.strokeRect(7, 7, size - 14, size - 14);
+      // letter
+      g.fillStyle = opts.pending ? '#083344' : '#451a03';
+      g.font = `700 ${Math.floor(size * (opts.small ? 0.62 : 0.72))}px Fredoka, Nunito, Arial, sans-serif`;
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(letter, size / 2, size / 2 + size * 0.04);
+      const tex = new THREE.CanvasTexture(cv);
+      tex.anisotropy = 4;
+      B3D.letterTexCache[key] = tex;
+      return tex;
+    }
+
+    function makeHeightBadgeTexture(height) {
+      const key = 'h' + height;
+      if (B3D.letterTexCache[key]) return B3D.letterTexCache[key];
+      const size = 128;
+      const cv = document.createElement('canvas');
+      cv.width = size; cv.height = size * 0.5;
+      const g = cv.getContext('2d');
+      const hot = height >= 4;
+      g.fillStyle = hot ? '#e11d48' : (height >= 2 ? '#1e1b4b' : 'rgba(120,53,15,0.15)');
+      g.beginPath();
+      const r = 18;
+      g.moveTo(r, 0); g.lineTo(size - r, 0); g.arcTo(size, 0, size, 0, r); g.lineTo(size, size);
+      g.lineTo(0, size); g.lineTo(0, r); g.arcTo(0, 0, r, 0, r); g.fill();
+      g.fillStyle = hot ? '#ffffff' : (height >= 2 ? '#fbbf24' : '#78350f');
+      g.font = '800 44px Nunito, Arial, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('x' + height, size / 2, size * 0.27);
+      const tex = new THREE.CanvasTexture(cv);
+      B3D.letterTexCache[key] = tex;
+      return tex;
+    }
+
+    function initBoard3D() {
+      if (B3D.inited) return;
+      B3D.inited = true;
+
+      const wrap = document.getElementById('board3dWrap');
+      const canvas = document.getElementById('board3dCanvas');
+      B3D.scene = new THREE.Scene();
+      B3D.scene.background = new THREE.Color(0x1e1b4b);
+      B3D.scene.fog = new THREE.Fog(0x1e1b4b, 18, 40);
+
+      B3D.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 100);
+      B3D.camera.position.set(0, 9.5, 8.5);
+      B3D.camera.lookAt(0, 0, 0);
+
+      B3D.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      B3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // ---- Lights ----
+      B3D.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+      const key = new THREE.DirectionalLight(0xfff2cc, 0.95);
+      key.position.set(6, 12, 6);
+      B3D.scene.add(key);
+      const fill = new THREE.DirectionalLight(0x818cf8, 0.35);
+      fill.position.set(-7, 6, -5);
+      B3D.scene.add(fill);
+      const under = new THREE.PointLight(0xa5b4fc, 0.5, 20);
+      under.position.set(0, 3.5, 0);
+      B3D.scene.add(under);
+
+      // ---- Board base slab ----
+      const boardSize = BOARD_N * CELL;
+      const slabGeo = new THREE.BoxGeometry(boardSize + 0.7, 0.5, boardSize + 0.7);
+      const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ color: 0x312e81 }));
+      slab.position.y = -0.5;
+      B3D.scene.add(slab);
+
+      // ---- 64 base plates (visual) + pick plates (raycast) ----
+      B3D.stackGroups = new THREE.Group();
+      B3D.scene.add(B3D.stackGroups);
+      B3D.raycaster = new THREE.Raycaster();
+
+      const plateGeo = new THREE.BoxGeometry(CELL * 0.96, 0.1, CELL * 0.96);
+      B3D.cellMeshes = [];
+      for (let r = 0; r < BOARD_N; r++) {
+        for (let c = 0; c < BOARD_N; c++) {
+          const isCenter = (r === 3 || r === 4) && (c === 3 || c === 4);
+          const plate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
+            color: isCenter ? 0x4338ca : 0x334155,
+            roughness: 0.85
+          }));
+          plate.position.set(c * CELL - boardSize / 2 + CELL / 2, 0, r * CELL - boardSize / 2 + CELL / 2);
+          plate.userData = { r, c };
+          B3D.scene.add(plate);
+          B3D.cellMeshes.push(plate);
+        }
+      }
+
+      // ---- Hover highlight plate ----
+      const hoverGeo = new THREE.BoxGeometry(CELL, 0.06, CELL);
+      B3D.hoverPlate = new THREE.Mesh(hoverGeo, new THREE.MeshBasicMaterial({
+        color: 0x34d399, transparent: true, opacity: 0.45
+      }));
+      B3D.hoverPlate.visible = false;
+      B3D.scene.add(B3D.hoverPlate);
+
+      // ---- Orbit controls ----
+      B3D.controls = new THREE.OrbitControls(B3D.camera, canvas);
+      B3D.controls.enableDamping = true;
+      B3D.controls.dampingFactor = 0.08;
+      B3D.controls.minDistance = 4;
+      B3D.controls.maxDistance = 22;
+      B3D.controls.maxPolarAngle = Math.PI / 2.15;
+      B3D.controls.target.set(0, 0.5, 0);
+      B3D.controls.addEventListener('change', () => { B3D.needsRender = true; });
+
+      // ---- Pointer events (raycast hover + click) ----
+      const pointer = { x: 0, y: 0, downAt: null, moved: false };
+
+      function updatePointer(e) {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      }
+
+      canvas.addEventListener('pointermove', (e) => {
+        updatePointer(e);
+        if (pointer.downAt) {
+          const dx = e.clientX - pointer.downAt.x, dy = e.clientY - pointer.downAt.y;
+          if (Math.hypot(dx, dy) > 6) pointer.moved = true;
+        }
+        B3D.needsRender = true;
+      });
+
+      canvas.addEventListener('pointerdown', (e) => {
+        updatePointer(e);
+        pointer.downAt = { x: e.clientX, y: e.clientY };
+        pointer.moved = false;
+      });
+
+      canvas.addEventListener('pointerup', (e) => {
+        updatePointer(e);
+        const wasDrag = pointer.moved;
+        pointer.downAt = null;
+        if (wasDrag) return;
+        const hit = raycastCell();
+        if (hit) handleBoardCellClick(hit.r, hit.c);
+      });
+
+      // Wheel zoom is handled by OrbitControls natively.
+
+      // ---- Drag & drop from rack (HTML5 DnD forwarded onto canvas) ----
+      canvas.addEventListener('dragover', (e) => e.preventDefault());
+      canvas.addEventListener('drop', (e) => {
+        e.preventDefault();
+        updatePointer(e);
+        const hit = raycastCell();
+        if (hit) handleCellDrop(e, hit.r, hit.c);
+      });
+
+      function raycastCell() {
+        B3D.raycaster.setFromCamera({ x: pointer.x, y: pointer.y }, B3D.camera);
+        const hits = B3D.raycaster.intersectObjects(B3D.cellMeshes);
+        if (hits.length) return hits[0].object.userData;
+        return null;
+      }
+
+      // ---- Animation loop (renders on demand + pop animation) ----
+      const clock = new THREE.Clock();
+      function tick() {
+        B3D.animId = requestAnimationFrame(tick);
+        const t = clock.getElapsedTime();
+        // hover raycast (cheap, only on pointer moves flagged)
+        if (pointer.downAt === null && B3D.pointerInside !== false) {
+          const hit = raycastCell();
+          if (hit) {
+            if (!B3D.hovered || B3D.hovered.r !== hit.r || B3D.hovered.c !== hit.c) {
+              B3D.hovered = hit;
+              inspectCellStack(hit.r, hit.c);
+            }
+            const boardSize2 = BOARD_N * CELL;
+            B3D.hoverPlate.position.set(hit.c * CELL - boardSize2 / 2 + CELL / 2, 0.09, hit.r * CELL - boardSize2 / 2 + CELL / 2);
+            B3D.hoverPlate.visible = true;
+            B3D.needsRender = true;
+          } else if (B3D.hoverPlate.visible) {
+            B3D.hoverPlate.visible = false;
+            B3D.hovered = null;
+            B3D.needsRender = true;
+          }
+        }
+        // gentle pop animation on freshly placed stacks
+        let popping = false;
+        if (B3D.stackGroups) {
+          B3D.stackGroups.children.forEach(gr => {
+            if (gr.userData.popT !== undefined) {
+              const age = t - gr.userData.popT;
+              if (age < 0.5) {
+                popping = true;
+                const s = 1 + Math.sin(Math.min(age / 0.5, 1) * Math.PI) * 0.18;
+                gr.scale.set(s, 1, s);
+              } else {
+                gr.scale.set(1, 1, 1);
+                delete gr.userData.popT;
+              }
+            }
+          });
+        }
+        // hint cells pulse
+        if (B3D.hintPulse) {
+          const k = (Math.sin(t * 4) + 1) / 2;
+          B3D.hintPulse.forEach(m => { m.material.opacity = 0.25 + k * 0.5; m.position.y = 0.06 + k * 0.05; });
+          B3D.needsRender = true;
+        }
+        B3D.controls.update();
+        if (B3D.needsRender || popping) {
+          B3D.renderer.render(B3D.scene, B3D.camera);
+          B3D.needsRender = false;
+        }
+      }
+      tick();
+
+      // ---- Resize handling ----
+      function resize() {
+        const w = wrap.clientWidth, h = wrap.clientHeight;
+        if (w === 0 || h === 0) return;
+        B3D.renderer.setSize(w, h, false);
+        B3D.camera.aspect = w / h;
+        B3D.camera.updateProjectionMatrix();
+        B3D.needsRender = true;
+      }
+      window.addEventListener('resize', resize);
+      new ResizeObserver(resize).observe(wrap);
+      resize();
+
+      // Initial build
+      renderBoard3D();
+    }
+
+    function renderBoard3D() {
+      if (!B3D.inited) { initBoard3D(); return; }
+      // clear old stacks
+      while (B3D.stackGroups.children.length) {
+        const gr = B3D.stackGroups.children[0];
+        B3D.stackGroups.remove(gr);
+      }
+      B3D.hintPulse = null;
+
+      const boardSize = BOARD_N * CELL;
+      const tileGeo = new THREE.BoxGeometry(CELL * 0.94, TILE_H, CELL * 0.94);
+      const badgeGeo = new THREE.PlaneGeometry(CELL * 0.42, CELL * 0.21);
+
+      for (let r = 0; r < BOARD_N; r++) {
+        for (let c = 0; c < BOARD_N; c++) {
+          const cell = board[r][c];
+          const letters = [...cell.stack];
+          if (cell.pending) letters.push(cell.pending.letter);
+          if (letters.length === 0) continue;
+
+          const isPending = !!cell.pending;
+          const gr = new THREE.Group();
+          const x = c * CELL - boardSize / 2 + CELL / 2;
+          const z = r * CELL - boardSize / 2 + CELL / 2;
+          gr.position.set(x, 0.05, z);
+          gr.userData.rc = { r, c };
+          if (isPending) gr.userData.popT = performance.now() / 1000 - B3D.clockHack;
+          if (performance.now() - B3D.lastPlacementTime < 800 && !isPending) {
+            gr.userData.popT = performance.now() / 1000 - B3D.clockHack;
+          }
+
+          letters.forEach((ltr, i) => {
+            const isTop = i === letters.length - 1;
+            const mats = [
+              new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 }), // right
+              new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.6 }), // left
+              new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 }), // top
+              new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8 }), // bottom
+              new THREE.MeshStandardMaterial({ map: makeLetterTexture(ltr, { pending: isPending && isTop }) }), // front
+              new THREE.MeshStandardMaterial({ map: makeLetterTexture(ltr, { pending: isPending && isTop }) })  // back
+            ];
+            const tile = new THREE.Mesh(tileGeo, mats);
+            tile.position.y = TILE_H / 2 + i * TILE_H;
+            gr.add(tile);
+            if (isTop) {
+              // height badge floating above the stack
+              const badge = new THREE.Mesh(badgeGeo, new THREE.MeshBasicMaterial({
+                map: makeHeightBadgeTexture(letters.length),
+                transparent: true, depthWrite: false
+              }));
+              badge.position.y = TILE_H / 2 + letters.length * TILE_H + 0.16;
+              badge.rotation.x = -0.45;
+              gr.add(badge);
+            }
+          });
+          B3D.stackGroups.add(gr);
+        }
+      }
+
+      // hint pulse plates
+      if (typeof activeHintCells !== 'undefined' && activeHintCells.length) {
+        B3D.hintPulse = [];
+        activeHintCells.forEach(h => {
+          const m = new THREE.Mesh(
+            new THREE.BoxGeometry(CELL * 0.98, 0.05, CELL * 0.98),
+            new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.4 })
+          );
+          m.position.set(h.c * CELL - boardSize / 2 + CELL / 2, 0.08, h.r * CELL - boardSize / 2 + CELL / 2);
+          B3D.scene.add(m);
+          B3D.hintPulse.push(m);
+        });
+      }
+      B3D.needsRender = true;
+    }
+
+    // Patch renderBoardGrid so every existing game-logic call site
+    // (renderAllGameUI etc.) automatically refreshes the 3D scene too.
+    const _origRenderBoardGrid = renderBoardGrid;
+    renderBoardGrid = function () {
+      _origRenderBoardGrid();          // keeps hidden DOM grid + stack inspector in sync
+      renderBoard3D();
+    };
 
     function inspectCellStack(r, c) {
       const cell = board[r][c];
